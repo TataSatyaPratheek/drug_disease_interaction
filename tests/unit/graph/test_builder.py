@@ -47,7 +47,7 @@ class TestKnowledgeGraphBuilder:
         assert graph.nodes["BE0000001"]["type"] == "protein"
         
         # Check that relationships were added
-        assert any(graph.edges[e]["type"] == "targets" for e in graph.edges())
+        assert any(data["type"] == "targets" for _, _, data in graph.edges(data=True))
     
     def test_add_disease_data(self, sample_mesh_data, test_output_dir):
         """Test adding disease data to graph"""
@@ -250,7 +250,10 @@ class TestKnowledgeGraphBuilder:
         
         # Verify GraphML file
         g_graphml = nx.read_graphml(output_files["graphml"])
-        assert g_graphml.number_of_nodes() == sample_graph.number_of_nodes()
+        # assert g_graphml.number_of_nodes() == sample_graph.number_of_nodes() # Original assertion
+        # More robust check: compare the set of node IDs
+        assert set(g_graphml.nodes()) == set(sample_graph.nodes())
+
         
         # Verify pickle file
         with open(output_files["pickle"], "rb") as f:
@@ -276,114 +279,3 @@ class TestKnowledgeGraphBuilder:
         assert builder._normalize_id("Test, String.") == "test_string"
         assert builder._normalize_id("") == ""
         assert builder._normalize_id(None) == ""
-
-
-# tests/unit/graph/test_conversion.py
-import pytest
-import os
-import pickle
-import networkx as nx
-import torch
-from pathlib import Path
-from src.ddi.graph.builder import KnowledgeGraphBuilder
-
-# Skip this test module if DGL is not available
-try:
-    import dgl
-    HAS_DGL = True
-except ImportError:
-    HAS_DGL = False
-
-@pytest.mark.skipif(not HAS_DGL, reason="DGL not installed")
-class TestGraphConversion:
-    """Test graph conversion functions in KnowledgeGraphBuilder"""
-    
-    def test_convert_to_dgl(self, sample_graph, test_output_dir):
-        """Test conversion from NetworkX to DGL"""
-        builder = KnowledgeGraphBuilder(output_dir=str(test_output_dir))
-        
-        # Set graph
-        builder.graph = sample_graph
-        
-        # Set type counters
-        builder.node_types = {
-            "drug": 2,
-            "protein": 1,
-            "polypeptide": 1,
-            "disease": 2
-        }
-        
-        builder.edge_types = {
-            "targets": 1,
-            "has_polypeptide": 1,
-            "treats": 1,
-            "associated_with": 1
-        }
-        
-        # Convert to DGL
-        dgl_graph = builder._convert_to_dgl()
-        
-        # Check DGL graph
-        assert dgl_graph is not None
-        assert isinstance(dgl_graph, dgl.DGLGraph)
-        assert dgl_graph.number_of_nodes() == sample_graph.number_of_nodes()
-        assert dgl_graph.number_of_edges() == sample_graph.number_of_edges()
-        
-        # Check node features
-        assert "type" in dgl_graph.ndata
-        assert isinstance(dgl_graph.ndata["type"], torch.Tensor)
-        assert dgl_graph.ndata["type"].shape[0] == dgl_graph.number_of_nodes()
-        
-        # Check edge features
-        assert "type" in dgl_graph.edata
-        assert isinstance(dgl_graph.edata["type"], torch.Tensor)
-        assert dgl_graph.edata["type"].shape[0] == dgl_graph.number_of_edges()
-        
-        # Check mappings
-        assert hasattr(dgl_graph, "node_type_to_id")
-        assert hasattr(dgl_graph, "edge_type_to_id")
-        assert hasattr(dgl_graph, "id_to_node_type")
-        assert hasattr(dgl_graph, "id_to_edge_type")
-        assert hasattr(dgl_graph, "node_to_idx")
-        assert hasattr(dgl_graph, "idx_to_node")
-        
-        # Test mappings correctness
-        assert len(dgl_graph.node_type_to_id) == len(builder.node_types)
-        assert len(dgl_graph.edge_type_to_id) == len(builder.edge_types)
-    
-    def test_save_graph_with_dgl(self, sample_graph, test_output_dir):
-        """Test saving graph with DGL format"""
-        builder = KnowledgeGraphBuilder(output_dir=str(test_output_dir))
-        
-        # Set graph
-        builder.graph = sample_graph
-        
-        # Set type counters
-        builder.node_types = {
-            "drug": 2,
-            "protein": 1,
-            "polypeptide": 1,
-            "disease": 2
-        }
-        
-        builder.edge_types = {
-            "targets": 1,
-            "has_polypeptide": 1,
-            "treats": 1,
-            "associated_with": 1
-        }
-        
-        # Save graph with DGL format
-        output_files = builder.save_graph(formats=["dgl"])
-        
-        # Check that DGL file was created
-        assert "dgl" in output_files
-        assert os.path.exists(output_files["dgl"])
-        
-        # Verify DGL file
-        gs, _ = dgl.load_graphs(output_files["dgl"])
-        assert len(gs) == 1
-        
-        g = gs[0]
-        assert g.number_of_nodes() == sample_graph.number_of_nodes()
-        assert g.number_of_edges() == sample_graph.number_of_edges()

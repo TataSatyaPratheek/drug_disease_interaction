@@ -107,16 +107,15 @@ class MeSHParser:
                                 tree_numbers.append(tree_elem.text)
                     
                     # Check if this is a disease category
-                    is_disease = False
-                    for tree_number in tree_numbers:
-                        category = tree_number.split('.')[0] if '.' in tree_number else tree_number
-                        if category in self.disease_categories:
-                            is_disease = True
-                            break
-                    
-                    # Skip if not a disease and not a main category
-                    if not is_disease and all(tn not in self.disease_categories for tn in tree_numbers):
-                        continue
+                    is_relevant_category = any(tn.startswith(tuple(self.disease_categories)) for tn in tree_numbers)
+
+                    if not is_relevant_category:
+                         continue # Skip if none of the tree numbers start with 'C'
+                    # ------------------------------------
+
+                    # Determine if it's specifically a disease (more specific than just category)
+                    # You might refine this definition later, e.g., based on depth or specific sub-branches
+                    is_disease_node = is_relevant_category # For now, treat any 'C' branch node as potentially disease-related
                     
                     # Extract scope note (description)
                     scope_note = None
@@ -144,7 +143,7 @@ class MeSHParser:
                             qualifier_ref = qualifier.find("./QualifierReferredTo/QualifierUI")
                             if qualifier_ref is not None and qualifier_ref.text:
                                 allowed_qualifiers.append(qualifier_ref.text)
-                    
+
                     # Store descriptor data
                     self.descriptors[descriptor_id] = {
                         "id": descriptor_id,
@@ -153,28 +152,33 @@ class MeSHParser:
                         "description": scope_note,
                         "synonyms": list(set(synonyms)),  # Remove duplicates
                         "allowed_qualifiers": allowed_qualifiers,
-                        "is_disease": is_disease
+                        # Store the flag indicating if it's considered a disease/disease-related node
+                        "is_disease": is_disease_node # <-- Ensure this is set
                     }
-                    
-                    # Update term to ID mapping
+
+                    # Update term to ID mapping (only if relevant)
                     self.term_to_id[descriptor_name.lower()] = descriptor_id
                     for synonym in synonyms:
-                        if synonym.lower() not in self.term_to_id:
+                        # --- FIX: Ensure synonym is string before lower() ---
+                        if isinstance(synonym, str) and synonym.lower() not in self.term_to_id:
                             self.term_to_id[synonym.lower()] = descriptor_id
-                    
-                    # Update disease hierarchy
+                        # ---------------------------------------------------
+
+                    # Update disease hierarchy (only if relevant)
                     for tree_number in tree_numbers:
-                        parts = tree_number.split('.')
-                        for i in range(1, len(parts)):
-                            parent = '.'.join(parts[:i])
-                            child = '.'.join(parts[:i+1])
-                            
-                            if parent not in self.disease_hierarchy:
-                                self.disease_hierarchy[parent] = []
-                                
-                            if child not in self.disease_hierarchy[parent]:
-                                self.disease_hierarchy[parent].append(child)
-                    
+                        # Only add disease-related branches to the hierarchy
+                        if tree_number.startswith(tuple(self.disease_categories)): # <-- Add this check
+                            parts = tree_number.split('.')
+                            for i in range(1, len(parts)):
+                                parent = '.'.join(parts[:i])
+                                child = '.'.join(parts[:i+1])
+
+                                if parent not in self.disease_hierarchy:
+                                    self.disease_hierarchy[parent] = []
+
+                                if child not in self.disease_hierarchy[parent]:
+                                    self.disease_hierarchy[parent].append(child)
+                                    
                 except Exception as e:
                     self.logger.warning(f"Error processing descriptor record: {str(e)}")
                     continue

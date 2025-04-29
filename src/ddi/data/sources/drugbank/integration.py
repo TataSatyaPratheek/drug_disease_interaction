@@ -93,9 +93,14 @@ class DrugBankIntegrator:
         if not self.integrated_data:
             self.logger.warning("No integrated data to validate")
             return
-            
+
         drugs = self.integrated_data["drugs"]
-        
+        num_drugs = len(drugs) # Get length once
+
+        if num_drugs == 0: # Add this check
+            self.logger.info("No drugs found in integrated data to validate.")
+            return
+
         # Check essential fields
         missing_fields = {
             "drugbank_id": 0,
@@ -103,15 +108,16 @@ class DrugBankIntegrator:
             "cas_number": 0,
             "inchikey": 0
         }
-        
+
         for drug in drugs:
             for field in missing_fields.keys():
+                # Check if field is missing OR if it exists but is falsy (None, empty string)
                 if field not in drug or not drug[field]:
                     missing_fields[field] += 1
-        
+
         self.logger.info("Data validation results:")
         for field, count in missing_fields.items():
-            percentage = (count / len(drugs)) * 100
+            percentage = (count / num_drugs) * 100 # Use num_drugs
             self.logger.info(f"  - {field}: {count} drugs missing ({percentage:.2f}%)")
     
     def save(self, format: str = "pickle") -> str:

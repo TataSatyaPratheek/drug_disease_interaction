@@ -25,244 +25,242 @@ class DrugBankVocabulary:
         
     def load(self) -> pd.DataFrame:
         """Load the vocabulary CSV
-        
+
         Returns:
             Pandas DataFrame containing the vocabulary data
         """
         self.logger.info(f"Loading DrugBank vocabulary from {self.csv_path}")
-        
-        # Read CSV with string type enforced for text columns
+        expected_cols = ["drugbank_id", "accession_numbers", "name",
+                         "cas_number", "unii", "synonyms", "inchikey"] # Define expected final columns
+
         try:
-            self.data = pd.read_csv(
-                self.csv_path, 
-                dtype={
-                    'DrugBank ID': str,
-                    'Common name': str,
-                    'CAS': str,
-                    'UNII': str,
-                    'Synonyms': str,
-                    'Standard InChI Key': str
-                }
-            )
-            
+            # Read CSV, let pandas infer types initially, but handle potential errors
+            self.data = pd.read_csv(self.csv_path)
+
             # Rename columns to standardized names if necessary
-            if "DrugBank ID" in self.data.columns:
-                self.data = self.data.rename(columns={
-                    "DrugBank ID": "drugbank_id",
-                    "Accession Numbers": "accession_numbers",
-                    "Common name": "name",
-                    "CAS": "cas_number",
-                    "UNII": "unii",
-                    "Synonyms": "synonyms",
-                    "Standard InChI Key": "inchikey"
-                })
-            
-            # Build mappings for lookups
+            column_mapping = {
+                "DrugBank ID": "drugbank_id",
+                "Accession Numbers": "accession_numbers",
+                "Common name": "name",
+                "CAS": "cas_number",
+                "UNII": "unii",
+                "Synonyms": "synonyms",
+                "Standard InChI Key": "inchikey"
+            }
+            rename_dict = {k: v for k, v in column_mapping.items() if k in self.data.columns}
+            if rename_dict:
+                self.data = self.data.rename(columns=rename_dict)
+
+            # --- Convert relevant columns to string AFTER loading & renaming ---
+            for col in expected_cols:
+                if col in self.data.columns:
+                    self.data[col] = self.data[col].fillna('').astype(str)
+                else:
+                    self.logger.warning(f"Column '{col}' not found in vocabulary CSV. Adding empty column.")
+                    self.data[col] = '' # Adds the column, likely at the end
+
+            # --- FIX: Ensure columns are in the expected order ---
+            self.data = self.data[expected_cols]
+            # -----------------------------------------------------
+
+            # Build mappings using the cleaned string data
             self._build_mappings()
-            
+
             self.logger.info(f"Loaded {len(self.data)} entries from vocabulary")
             return self.data
-            
+
         except Exception as e:
-            self.logger.error(f"Error loading vocabulary CSV: {str(e)}")
-            # Initialize empty DataFrame with expected columns to prevent further errors
-            self.data = pd.DataFrame(columns=[
-                "drugbank_id", "accession_numbers", "name", 
-                "cas_number", "unii", "synonyms", "inchikey"
-            ])
+            self.logger.error(f"Error loading or processing vocabulary CSV: {str(e)}")
+            self.data = pd.DataFrame(columns=expected_cols)
+            self._build_mappings()
             return self.data
-    
+
     def _build_mappings(self) -> None:
         """Build mapping dictionaries for efficient lookups"""
-        if self.data is None:
-            self.logger.warning("Cannot build mappings: data not loaded")
-            return
-        
-        # Map DrugBank ID to row index
+        # Reset mappings
         self.id_mapping = {}
-        for idx, row in self.data.iterrows():
-            if pd.notna(row.drugbank_id):
-                self.id_mapping[row.drugbank_id] = idx
-        
-        # Map CAS number to DrugBank ID
         self.cas_to_id = {}
-        for idx, row in self.data.iterrows():
-            if pd.notna(row.cas_number) and row.cas_number:
-                self.cas_to_id[row.cas_number] = row.drugbank_id
-                
-        # Map name to DrugBank ID (case-insensitive)
         self.name_to_id = {}
-        for idx, row in self.data.iterrows():
-            if pd.notna(row.name) and row.name:
-                try:
-                    # Ensure name is a string before calling lower()
-                    if isinstance(row.name, str):
-                        self.name_to_id[row.name.lower()] = row.drugbank_id
-                    else:
-                        # Convert to string if it's not already
-                        name_str = str(row.name).lower()
-                        self.name_to_id[name_str] = row.drugbank_id
-                        self.logger.warning(f"Name '{row.name}' was not a string, converted to '{name_str}'")
-                except Exception as e:
-                    self.logger.warning(f"Error processing name '{row.name}': {str(e)}")
-                
-        # Map InChI Key to DrugBank ID
         self.inchi_to_id = {}
-        for idx, row in self.data.iterrows():
-            if pd.notna(row.inchikey) and row.inchikey:
-                self.inchi_to_id[row.inchikey] = row.drugbank_id
-                
-        # Map UNII to DrugBank ID
         self.unii_to_id = {}
+
+        if self.data is None or self.data.empty:
+            self.logger.warning("Cannot build mappings: data not loaded or empty")
+            return
+
+        # --- Revert to iterrows, keeping str() conversion inside loop ---
         for idx, row in self.data.iterrows():
-            if pd.notna(row.unii) and row.unii:
-                self.unii_to_id[row.unii] = row.drugbank_id
-                
-        # Parse and map synonyms
-        for idx, row in self.data.iterrows():
-            if pd.notna(row.synonyms) and row.synonyms:
-                try:
-                    # Split synonyms by pipe character
-                    if isinstance(row.synonyms, str):
-                        for synonym in row.synonyms.split('|'):
+            try:
+                # Map DrugBank ID to row index
+                # Ensure row.drugbank_id is treated as string before stripping
+                drug_id = str(row['drugbank_id']).strip()
+                if drug_id:
+                    self.id_mapping[drug_id] = idx
+
+                # Map CAS number to DrugBank ID
+                cas = str(row['cas_number']).strip()
+                if cas and drug_id: # drug_id already checked
+                    self.cas_to_id[cas] = drug_id
+
+                # Map name to DrugBank ID (case-insensitive)
+                name = str(row['name']).strip()
+                if name and drug_id:
+                    name_lower = name.lower()
+                    # Add primary name (don't check if exists, primary should overwrite if duplicate)
+                    self.name_to_id[name_lower] = drug_id
+
+                # Map InChI Key to DrugBank ID
+                inchi = str(row['inchikey']).strip()
+                if inchi and drug_id:
+                    self.inchi_to_id[inchi] = drug_id
+
+                # Map UNII to DrugBank ID
+                unii = str(row['unii']).strip()
+                if unii and drug_id:
+                    self.unii_to_id[unii] = drug_id
+
+                # Parse and map synonyms (add to name_to_id)
+                syns = str(row['synonyms']).strip()
+                if syns and drug_id:
+                    for synonym in syns.split('|'):
+                        synonym_clean = synonym.strip()
+                        if synonym_clean:
+                            synonym_lower = synonym_clean.lower()
                             # Use lowercase for case-insensitive mapping
-                            # Don't overwrite existing primary names
-                            if synonym.lower() not in self.name_to_id:
-                                self.name_to_id[synonym.lower()] = row.drugbank_id
-                except Exception as e:
-                    self.logger.warning(f"Error processing synonyms for drug {row.drugbank_id}: {str(e)}")
-    
+                            # Add synonym only if the name isn't already mapped (primary name takes precedence)
+                            if synonym_lower not in self.name_to_id:
+                                self.name_to_id[synonym_lower] = drug_id
+            except Exception as e:
+                 # Log error for the specific row but continue processing others
+                 current_id = row.get('drugbank_id', f'index {idx}') # Get ID if possible
+                 self.logger.error(f"Error processing mappings for row {current_id}: {e}")
+                 continue 
+
     def get_drug_by_id(self, drugbank_id: str) -> Optional[Dict[str, Any]]:
-        """Get drug information by DrugBank ID
-        
-        Args:
-            drugbank_id: DrugBank ID
-            
-        Returns:
-            Dictionary with drug information or None if not found
-        """
-        if drugbank_id not in self.id_mapping:
+        """Get drug information by DrugBank ID"""
+        # Strip input ID just in case
+        drugbank_id_clean = drugbank_id.strip()
+        if drugbank_id_clean not in self.id_mapping:
             return None
-            
-        idx = self.id_mapping[drugbank_id]
-        row = self.data.iloc[idx]
-        
+
+        idx = self.id_mapping[drugbank_id_clean]
+        # Use .loc for potentially safer access than iloc if index isn't guaranteed sequential
         try:
+             row = self.data.loc[idx]
+        except KeyError:
+             self.logger.warning(f"Index {idx} not found for drug {drugbank_id_clean}. Data inconsistency?")
+             return None
+
+
+        try:
+            # Access columns using the cleaned names, handle potential missing columns gracefully
             return {
-                "drugbank_id": row.drugbank_id,
-                "accession_numbers": row.accession_numbers if pd.notna(row.accession_numbers) else None,
-                "name": row.name if pd.notna(row.name) else None,
-                "cas_number": row.cas_number if pd.notna(row.cas_number) else None,
-                "unii": row.unii if pd.notna(row.unii) else None,
-                "synonyms": row.synonyms.split('|') if pd.notna(row.synonyms) else [],
-                "inchikey": row.inchikey if pd.notna(row.inchikey) else None
+                "drugbank_id": row.get('drugbank_id', drugbank_id_clean), # Use cleaned ID as fallback
+                "accession_numbers": row.get('accession_numbers', None), # Assuming this column might exist
+                "name": row.get('name', None),
+                "cas_number": row.get('cas_number', None),
+                "unii": row.get('unii', None),
+                # Split synonyms only if it's a non-empty string
+                "synonyms": row.get('synonyms', '').split('|') if row.get('synonyms') else [],
+                "inchikey": row.get('inchikey', None)
             }
         except Exception as e:
-            self.logger.warning(f"Error retrieving drug {drugbank_id}: {str(e)}")
+            self.logger.warning(f"Error retrieving data for drug {drugbank_id_clean} at index {idx}: {str(e)}")
             return {
-                "drugbank_id": drugbank_id,
-                "name": drugbank_id  # Fallback to using ID as name
+                "drugbank_id": drugbank_id_clean,
+                "name": drugbank_id_clean,
+                "synonyms": []
             }
-    
+
     def get_id_by_name(self, name: str) -> Optional[str]:
-        """Get DrugBank ID by drug name (case-insensitive)
-        
-        Args:
-            name: Drug name
-            
-        Returns:
-            DrugBank ID or None if not found
-        """
-        try:
-            return self.name_to_id.get(name.lower())
-        except:
-            # Handle case where name is not a string
-            try:
-                return self.name_to_id.get(str(name).lower())
-            except:
-                return None
-    
+        """Get DrugBank ID by drug name (case-insensitive)"""
+        if not isinstance(name, str): # Handle non-string input
+             name = str(name)
+        # Use cleaned name for lookup
+        return self.name_to_id.get(name.strip().lower())
+
+    # ... (get_id_by_cas, get_id_by_inchikey, get_id_by_unii should also strip input) ...
     def get_id_by_cas(self, cas: str) -> Optional[str]:
-        """Get DrugBank ID by CAS number
-        
-        Args:
-            cas: CAS number
-            
-        Returns:
-            DrugBank ID or None if not found
-        """
-        return self.cas_to_id.get(cas)
-    
+        if not isinstance(cas, str): cas = str(cas)
+        return self.cas_to_id.get(cas.strip())
+
     def get_id_by_inchikey(self, inchikey: str) -> Optional[str]:
-        """Get DrugBank ID by InChIKey
-        
-        Args:
-            inchikey: InChIKey
-            
-        Returns:
-            DrugBank ID or None if not found
-        """
-        return self.inchi_to_id.get(inchikey)
-    
+        if not isinstance(inchikey, str): inchikey = str(inchikey)
+        return self.inchi_to_id.get(inchikey.strip())
+
     def get_id_by_unii(self, unii: str) -> Optional[str]:
-        """Get DrugBank ID by UNII
-        
-        Args:
-            unii: UNII
-            
-        Returns:
-            DrugBank ID or None if not found
-        """
-        return self.unii_to_id.get(unii)
-    
+        if not isinstance(unii, str): unii = str(unii)
+        return self.unii_to_id.get(unii.strip())
+
     def validate_drug_id(self, drugbank_id: str) -> bool:
-        """Validate if a DrugBank ID exists in the vocabulary
-        
-        Args:
-            drugbank_id: DrugBank ID to validate
-            
-        Returns:
-            True if ID exists, False otherwise
-        """
-        return drugbank_id in self.id_mapping
+        """Validate if a DrugBank ID exists in the vocabulary"""
+        if not isinstance(drugbank_id, str): return False
+        return drugbank_id.strip() in self.id_mapping
+
+
     
     def enrich_drug_data(self, drug_data: Dict[str, Any]) -> Dict[str, Any]:
         """Enrich drug data with information from vocabulary
-        
+
         Args:
             drug_data: Drug data dictionary with drugbank_id
-            
+
         Returns:
             Enriched drug data
         """
         if "drugbank_id" not in drug_data:
             self.logger.warning("Cannot enrich drug data: drugbank_id missing")
             return drug_data
-            
-        voc_data = self.get_drug_by_id(drug_data["drugbank_id"])
+
+        drugbank_id_clean = str(drug_data["drugbank_id"]).strip() # Clean ID for lookup
+        voc_data = self.get_drug_by_id(drugbank_id_clean) # Use cleaned ID
         if not voc_data:
+            # Log if enrichment fails because vocab data wasn't found
+            self.logger.debug(f"No vocabulary data found for {drugbank_id_clean} during enrichment.")
             return drug_data
-            
-        # Add missing fields from vocabulary
+
+        # Start with a copy of the input data
         enriched = drug_data.copy()
-        
-        # Add accession numbers if missing
-        if "accession_numbers" not in enriched and "accession_numbers" in voc_data:
-            enriched["accession_numbers"] = voc_data["accession_numbers"]
-            
-        # Add UNII if missing
-        if "unii" not in enriched and "unii" in voc_data:
-            enriched["unii"] = voc_data["unii"]
-            
-        # Add InChIKey if missing
-        if "inchikey" not in enriched and "inchikey" in voc_data:
-            enriched["inchikey"] = voc_data["inchikey"]
-            
-        # Merge synonyms
-        existing_synonyms = set(enriched.get("synonyms", []))
-        voc_synonyms = set(voc_data.get("synonyms", []))
-        enriched["synonyms"] = list(existing_synonyms.union(voc_synonyms))
-        
+
+        # --- Explicitly check and add/overwrite fields from vocabulary ---
+        # Use voc_data.get() for safety, although get_drug_by_id should handle missing keys
+
+        # Add accession numbers if missing in enriched
+        if "accession_numbers" not in enriched or not enriched["accession_numbers"]:
+            acc_nums = voc_data.get("accession_numbers")
+            if acc_nums: # Only add if not None/empty
+                enriched["accession_numbers"] = acc_nums
+
+        # Add UNII if missing in enriched
+        if "unii" not in enriched or not enriched["unii"]:
+             unii_val = voc_data.get("unii")
+             if unii_val: # Only add if not None/empty
+                 enriched["unii"] = unii_val # This is the key line
+
+        # Add InChIKey if missing in enriched
+        if "inchikey" not in enriched or not enriched["inchikey"]:
+            inchikey_val = voc_data.get("inchikey")
+            if inchikey_val: # Only add if not None/empty
+                enriched["inchikey"] = inchikey_val
+
+        # Add CAS number if missing in enriched (less likely, but for completeness)
+        if "cas_number" not in enriched or not enriched["cas_number"]:
+             cas_val = voc_data.get("cas_number")
+             if cas_val: # Only add if not None/empty
+                 enriched["cas_number"] = cas_val
+
+        # Merge synonyms (ensure lists are handled correctly)
+        existing_synonyms = set(enriched.get("synonyms", []) or []) # Handle None from XML
+        voc_synonyms_list = voc_data.get("synonyms", []) or [] # Handle None/empty list from vocab
+        voc_synonyms = set(s for s in voc_synonyms_list if s) # Ensure only non-empty strings in set
+        enriched["synonyms"] = sorted(list(existing_synonyms.union(voc_synonyms))) # Combine and sort for consistency
+
+        # Overwrite name if it's missing/empty in enriched (unlikely but possible)
+        if "name" not in enriched or not enriched["name"]:
+             name_val = voc_data.get("name")
+             if name_val:
+                 enriched["name"] = name_val
+
         return enriched
 
 

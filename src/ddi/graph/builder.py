@@ -9,15 +9,16 @@ import numpy as np
 from typing import Dict, List, Tuple, Any, Optional, Set
 from tqdm import tqdm
 
-# Try to import DGL, but handle the case where it's not installed
-DGL_AVAILABLE = False
+# Try to import PyTorch Geometric, but handle the case where it's not installed
+PYG_AVAILABLE = False
 try:
     import torch
-    import dgl
-    DGL_AVAILABLE = True
+    import torch_geometric
+    from torch_geometric.data import Data
+    PYG_AVAILABLE = True
 except ImportError:
-    logging.warning("DGL or PyTorch not installed. DGL graph export will not be available.")
-    logging.warning("To install DGL: pip install dgl torch")
+    logging.warning("PyTorch Geometric not installed. PyG graph export will not be available.")
+    logging.warning("To install PyTorch Geometric: pip install torch torch-geometric")
 
 class KnowledgeGraphBuilder:
     """Builds a knowledge graph from multiple data sources"""
@@ -536,101 +537,121 @@ class KnowledgeGraphBuilder:
     
     def save_graph(self, formats: List[str] = ["graphml", "pickle"]) -> Dict[str, str]:
         """Save graph to files
-        
+
         Args:
             formats: List of output formats
-            
+
         Returns:
             Dictionary of output file paths
         """
         output_files = {}
-        
+
         for fmt in formats:
             output_path = os.path.join(self.output_dir, f"knowledge_graph.{fmt}")
-            
+
             if fmt == "graphml":
-                # Remove complex attributes that can't be serialized to GraphML
-                clean_graph = nx.MultiDiGraph()
+                self.logger.info("Preparing simplified graph for GraphML export...")
+                # Create a separate, simplified graph for GraphML export
+                clean_graph_ml = nx.MultiDiGraph()
+
+                # Add nodes with minimal attributes
                 for n, attrs in self.graph.nodes(data=True):
-                    clean_attrs = {}
-                    for k, v in attrs.items():
-                        if isinstance(v, (str, int, float, bool)) or v is None:
-                            clean_attrs[k] = v
-                        elif isinstance(v, list):
-                            # Convert lists to strings
-                            clean_attrs[k] = "|".join(str(x) for x in v)
-                        else:
-                            # Skip complex objects
-                            continue
-                    clean_graph.add_node(n, **clean_attrs)
-                
+                    ml_attrs = {
+                        'type': str(attrs.get('type', '')),
+                        'name': str(attrs.get('name', n)) # Use node ID as fallback name
+                    }
+                    # Ensure attributes are simple strings for GraphML
+                    ml_attrs = {k: v for k, v in ml_attrs.items() if isinstance(v, (str, int, float, bool))}
+                    clean_graph_ml.add_node(n, **ml_attrs)
+
+                # Add edges with minimal attributes
                 for u, v, key, attrs in self.graph.edges(keys=True, data=True):
-                    clean_attrs = {}
-                    for k, v in attrs.items():
-                        if isinstance(v, (str, int, float, bool)) or v is None:
-                            clean_attrs[k] = v
-                        elif isinstance(v, list):
-                            # Convert lists to strings
-                            clean_attrs[k] = "|".join(str(x) for x in v)
-                        else:
-                            # Skip complex objects
-                            continue
-                    clean_graph.add_edge(u, v, key=key, **clean_attrs)
-                
-                nx.write_graphml(clean_graph, output_path)
-            
+                    # Ensure source and target nodes exist in the simplified graph
+                    if clean_graph_ml.has_node(u) and clean_graph_ml.has_node(v):
+                        ml_attrs = {
+                            'type': str(attrs.get('type', ''))
+                        }
+                        # Ensure attributes are simple strings for GraphML
+                        ml_attrs = {k: v for k, v in ml_attrs.items() if isinstance(v, (str, int, float, bool))}
+                        clean_graph_ml.add_edge(u, v, key=key, **ml_attrs)
+                    else:
+                        self.logger.warning(f"Skipping edge ({u}, {v}) for GraphML due to missing node in simplified graph.")
+
+                try:
+                    nx.write_graphml(clean_graph_ml, output_path)
+                    self.logger.info(f"Saved simplified graph in GraphML format to {output_path}")
+                except Exception as e:
+                    self.logger.error(f"Error writing GraphML file: {e}")
+                    continue # Skip adding to output_files if saving failed
+
             elif fmt == "pickle":
-                with open(output_path, "wb") as f:
-                    pickle.dump(self.graph, f)
-            
-            elif fmt == "dgl":
-                if DGL_AVAILABLE:
-                    # Convert to DGL graph
-                    dgl_graph = self._convert_to_dgl()
-                    
-                    # Save DGL graph
-                    dgl.save_graphs(output_path, [dgl_graph])
-                else:
-                    self.logger.warning("DGL not available. Skipping DGL format export.")
+                try:
+                    with open(output_path, "wb") as f:
+                        pickle.dump(self.graph, f)
+                    self.logger.info(f"Saved graph in pickle format to {output_path}")
+                except Exception as e:
+                    self.logger.error(f"Error writing pickle file: {e}")
                     continue
-            
+
+            elif fmt == "pyg":
+                if PYG_AVAILABLE:
+                    pyg_graph = self._convert_to_pyg()
+                    if pyg_graph is not None:
+                        try:
+                            # Use pickle for saving PyG data object
+                            with open(output_path, "wb") as f:
+                                pickle.dump(pyg_graph, f)
+                            self.logger.info(f"Saved graph in PyG format (via pickle) to {output_path}")
+                        except Exception as e:
+                            self.logger.error(f"Error writing PyG file: {e}")
+                            continue
+                    else:
+                        self.logger.warning("Failed to create PyG graph. Skipping PyG format export.")
+                        continue
+                else:
+                    self.logger.warning("PyTorch Geometric not available. Skipping PyG format export.")
+                    continue
             else:
-                self.logger.warning(f"Unsupported format: {fmt}")
-                continue
-                
+                 self.logger.warning(f"Unsupported save format: {fmt}")
+                 continue
+
+            # Only add to output_files if saving was successful (or attempted for unsupported)
             output_files[fmt] = output_path
-            self.logger.info(f"Saved graph in {fmt} format to {output_path}")
-        
-        # Save node and edge type mappings
+
+
+        # Save node and edge type mappings (remains the same)
         mappings = {
             "node_types": self.node_types,
             "edge_types": self.edge_types,
             "statistics": self.get_statistics()
         }
-        
         mappings_path = os.path.join(self.output_dir, "graph_mappings.json")
-        with open(mappings_path, "w") as f:
-            json.dump(mappings, f, indent=2)
-        
-        output_files["mappings"] = mappings_path
-        self.logger.info(f"Saved graph mappings to {mappings_path}")
-        
+        try:
+            with open(mappings_path, "w") as f:
+                json.dump(mappings, f, indent=2)
+            output_files["mappings"] = mappings_path
+            self.logger.info(f"Saved graph mappings to {mappings_path}")
+        except Exception as e:
+             self.logger.error(f"Error writing mappings JSON file: {e}")
+
+
         return output_files
-    
-    def _convert_to_dgl(self):
-        """Convert NetworkX graph to DGL graph
+
+    def _convert_to_pyg(self):
+        """Convert NetworkX graph to PyTorch Geometric Data object
         
         Returns:
-            DGL graph
+            PyTorch Geometric Data object
         """
-        if not DGL_AVAILABLE:
-            self.logger.error("DGL not available. Cannot convert to DGL format.")
+        if not PYG_AVAILABLE:
+            self.logger.error("PyTorch Geometric not available. Cannot convert to PyG format.")
             return None
             
-        self.logger.info("Converting NetworkX graph to DGL format")
+        self.logger.info("Converting NetworkX graph to PyTorch Geometric format")
         
         try:
             import torch
+            from torch_geometric.data import Data
             
             # Create node and edge type mappings
             node_type_to_id = {t: i for i, t in enumerate(sorted(self.node_types.keys()))}
@@ -644,38 +665,38 @@ class KnowledgeGraphBuilder:
             # Create mapping from node ID to index
             node_to_idx = {node: i for i, node in enumerate(nodes)}
             
-            # Create edge lists
-            src_nodes = []
-            dst_nodes = []
-            edge_types = []
+            # Create edge index and edge attributes
+            edge_index = [[], []]  # [src_nodes, dst_nodes]
+            edge_types_list = []
             
             for u, v, data in self.graph.edges(data=True):
-                src_nodes.append(node_to_idx[u])
-                dst_nodes.append(node_to_idx[v])
-                edge_types.append(edge_type_to_id[data["type"]])
+                edge_index[0].append(node_to_idx[u])
+                edge_index[1].append(node_to_idx[v])
+                edge_types_list.append(edge_type_to_id[data["type"]])
             
-            # Create DGL graph
-            dgl_graph = dgl.graph((src_nodes, dst_nodes))
+            # Convert to tensors
+            edge_index = torch.tensor(edge_index, dtype=torch.long)
+            node_type = torch.tensor(node_types, dtype=torch.long)
+            edge_type = torch.tensor(edge_types_list, dtype=torch.long)
             
-            # Add node features
-            dgl_graph.ndata["type"] = torch.tensor(node_types)
-            dgl_graph.ndata["idx"] = torch.arange(len(nodes))
+            # Create PyG Data object
+            data = Data(
+                x=node_type.view(-1, 1),  # Node features (just type for now)
+                edge_index=edge_index,
+                edge_attr=edge_type.view(-1, 1),  # Edge features (just type for now)
+                num_nodes=len(nodes)
+            )
             
-            # Add edge features
-            dgl_graph.edata["type"] = torch.tensor(edge_types)
+            # Add metadata as attributes
+            data.node_type_to_id = node_type_to_id
+            data.edge_type_to_id = edge_type_to_id
+            data.id_to_node_type = {v: k for k, v in node_type_to_id.items()}
+            data.id_to_edge_type = {v: k for k, v in edge_type_to_id.items()}
+            data.node_to_idx = node_to_idx
+            data.idx_to_node = nodes
             
-            # Add mappings as attributes
-            dgl_graph.node_type_to_id = node_type_to_id
-            dgl_graph.edge_type_to_id = edge_type_to_id
-            dgl_graph.id_to_node_type = {v: k for k, v in node_type_to_id.items()}
-            dgl_graph.id_to_edge_type = {v: k for k, v in edge_type_to_id.items()}
-            
-            # Add node ID to index mapping
-            dgl_graph.node_to_idx = node_to_idx
-            dgl_graph.idx_to_node = nodes
-            
-            return dgl_graph
+            return data
             
         except Exception as e:
-            self.logger.error(f"Error converting to DGL graph: {str(e)}")
+            self.logger.error(f"Error converting to PyTorch Geometric graph: {str(e)}")
             return None

@@ -31,10 +31,17 @@ class DrugBankXMLParser:
         self.db_tag_prefix = f"{{{self.db_ns_uri}}}"
 
     def _get_namespace(self, element):
-        """Extract namespace from an element's tag."""
-        if '}' in element.tag:
-            return element.tag.split('}')[0][1:]
+        """Extract namespace URI from an element's tag (e.g., {uri}tag)."""
+        tag = element.tag
+        # Check if the tag is namespaced (contains '}')
+        if '}' in tag and tag.startswith('{'):
+            # Find the index of the closing brace
+            end_brace_index = tag.find('}')
+            # Extract the URI part between the braces
+            return tag[1:end_brace_index]
+        # Return None if no namespace URI is found in the tag format {uri}tag
         return None
+
 
     def parse(self, limit: Optional[int] = None) -> Dict[str, Any]:
         """Parse the DrugBank XML file iteratively using lxml.iterparse
@@ -49,116 +56,152 @@ class DrugBankXMLParser:
 
         drugs = []
         version = "unknown"
-        context = etree.iterparse(self.xml_file_path, events=('start', 'end'), recover=True) # recover=True helps with potential errors
+        context = None
+        pbar = None # Initialize pbar to None
 
-        drug_count = 0
-        root_processed = False
+        try:
+            # Use iterparse for memory efficiency - DO NOT filter by tag here
+            context = etree.iterparse(self.xml_file_path, events=("start", "end"), recover=True) # Added recover=True for robustness
 
-        # Use tqdm for progress bar
-        # We don't know the total number of drugs beforehand easily with iterparse,
-        # so we won't have a percentage progress bar unless we pre-count or estimate.
-        # A simple count progress can be shown.
-        pbar = tqdm(desc="Parsing drugs", unit=" drugs")
+            drug_count = 0
+            root_processed = False
 
-        for event, elem in context:
-            # Determine namespace and version from the root element ('start' event)
-            if not root_processed and event == 'start' and 'drugbank' in elem.tag:
-                ns_uri = self._get_namespace(elem)
-                if ns_uri:
-                    self.db_ns_uri = ns_uri
-                    self.db_tag_prefix = f"{{{self.db_ns_uri}}}"
-                    self.ns = {"db": self.db_ns_uri}
-                    self.logger.info(f"Detected XML namespace: {self.db_ns_uri}")
+            # Use tqdm for progress bar - Initialize later when context is confirmed
+            # pbar = tqdm(desc="Parsing drugs", unit=" drugs") # Moved initialization
 
-                # Find version within the root element
-                version_elem = elem.find(f"{self.db_tag_prefix}version")
-                if version_elem is not None:
-                    version = version_elem.text
-                    self.logger.info(f"DrugBank version: {version}")
-                root_processed = True # Ensure this block runs only once
+            for event, elem in context:
+                # Determine namespace and version from the root element ('start' event)
+                if not root_processed and event == 'start':
+                    # Check if it's the drugbank root element (heuristic: ends with 'drugbank')
+                    if '}' in elem.tag and elem.tag.endswith('}drugbank'):
+                        ns_uri = self._get_namespace(elem)
+                        if ns_uri:
+                            self.db_ns_uri = ns_uri
+                            self.db_tag_prefix = f"{{{self.db_ns_uri}}}"
+                            self.ns = {"db": self.db_ns_uri} # Set self.ns HERE
+                            self.logger.info(f"Detected XML namespace: {self.db_ns_uri}")
+                        else:
+                             self.logger.warning("Could not determine namespace from root element. Parsing might fail.")
+                             # Attempt to guess common namespace
+                             self.db_ns_uri = "http://www.drugbank.ca"
+                             self.db_tag_prefix = f"{{{self.db_ns_uri}}}"
+                             self.ns = {"db": self.db_ns_uri}
+                             self.logger.warning(f"Assuming default namespace: {self.db_ns_uri}")
 
-            # Process each 'drug' element at its 'end' event
-            if event == 'end' and elem.tag == f"{self.db_tag_prefix}drug":
-                try:
-                    drug = self._parse_drug(elem)
-                    drugs.append(drug)
-                    drug_count += 1
-                    pbar.update(1) # Update progress bar
-                except Exception as e:
-                    # Attempt to get drug ID for error logging even if parsing failed
-                    drug_id_elem = elem.find(f"{self.db_tag_prefix}drugbank-id[@primary='true']")
-                    if drug_id_elem is None:
-                         drug_id_elem = elem.find(f"{self.db_tag_prefix}drugbank-id")
-                    drug_id = drug_id_elem.text if drug_id_elem is not None else "unknown_id"
-                    self.logger.error(f"Error parsing drug {drug_id}: {str(e)}", exc_info=True) # Add traceback
 
-                # Crucial for memory management with iterparse: clear the element
-                # and its ancestors to free memory
-                elem.clear()
-                # Also eliminate now-empty references from the root node to elem
-                while elem.getprevious() is not None:
-                    del elem.getparent()[0]
+                        # Find version within the root element using the determined/assumed namespace
+                        version_elem = elem.find(f"{self.db_tag_prefix}version")
+                        if version_elem is not None and version_elem.text is not None:
+                            version = version_elem.text.strip()
+                            self.logger.info(f"DrugBank version: {version}")
+                        root_processed = True
 
-                # Apply limit if specified
-                if limit is not None and drug_count >= limit:
-                    break
+                        # Initialize tqdm now that we are likely processing a valid file
+                        pbar = tqdm(desc="Parsing drugs", unit=" drugs")
 
-        pbar.close()
-        del context # Clean up the parser context
+
+                # Process each 'drug' element at its 'end' event
+                # Use the now-defined self.db_tag_prefix
+                if event == 'end' and elem.tag == f"{self.db_tag_prefix}drug":
+                    if not self.ns:
+                        # This should ideally not happen if root was processed, but as a fallback:
+                        ns_uri = self._get_namespace(elem)
+                        if ns_uri:
+                            self.db_ns_uri = ns_uri
+                            self.db_tag_prefix = f"{{{self.db_ns_uri}}}"
+                            self.ns = {"db": self.db_ns_uri}
+                            self.logger.warning(f"Namespace detected late from drug element: {self.db_ns_uri}")
+                        else:
+                            self.logger.error("Namespace not found, cannot parse drug details correctly. Skipping drug.")
+                            # Clear element and continue
+                            elem.clear()
+                            # Also eliminate now-empty references from the root node to elem
+                            while elem.getprevious() is not None:
+                                del elem.getparent()[0]
+                            continue
+
+                    try:
+                        drug = self._parse_drug(elem)
+                        if drug:
+                            drugs.append(drug)
+                            drug_count += 1
+                            if pbar is not None: pbar.update(1)
+                    except Exception as e:
+                        # Attempt to get drug ID for error logging
+                        drug_id_elem = elem.find(f"{self.db_tag_prefix}drugbank-id[@primary='true']", self.ns)
+                        if drug_id_elem is None:
+                            drug_id_elem = elem.find(f"{self.db_tag_prefix}drugbank-id", self.ns)
+                        drug_id = drug_id_elem.text.strip() if drug_id_elem is not None and drug_id_elem.text else "unknown_id"
+                        self.logger.error(f"Error parsing drug {drug_id}: {str(e)}", exc_info=True)
+
+                    # Crucial for memory management with iterparse: clear the element
+                    elem.clear()
+                    # Also eliminate now-empty references from the root node to elem
+                    while elem.getprevious() is not None:
+                        del elem.getparent()[0]
+
+                    # Apply limit if specified
+                    if limit is not None and drug_count >= limit:
+                        break
+
+            if pbar is not None: pbar.close() # Close pbar if it was initialized
+
+        except FileNotFoundError:
+             self.logger.error(f"XML file not found: {self.xml_file_path}")
+             return {"version": version, "drugs": drugs}
+        except etree.XMLSyntaxError as e: # Catch XML syntax errors specifically
+            self.logger.error(f"XML Syntax Error in {self.xml_file_path}: {str(e)}", exc_info=True)
+            if pbar is not None:
+                try: pbar.close()
+                except: pass
+            return {"version": version, "drugs": drugs}
+        except Exception as e: # Catch other potential parsing errors
+            self.logger.error(f"Error during XML parsing setup or iteration for {self.xml_file_path}: {str(e)}", exc_info=True)
+            if pbar is not None:
+                 try: pbar.close()
+                 except: pass
+            return {"version": version, "drugs": drugs}
+        finally: # Ensure context is cleaned up
+             if context is not None:
+                 try:
+                     # Clear the context/iterator
+                     # For lxml's iterparse, clearing elements in the loop is the main thing.
+                     # Explicitly clearing the context object itself might not be necessary or available.
+                     pass
+                 except Exception as cleanup_e:
+                     self.logger.warning(f"Error during XML parser context cleanup: {cleanup_e}")
 
         self.logger.info(f"Successfully parsed {len(drugs)} drugs")
+        return {"version": version, "drugs": drugs}
 
-        # Return parsed data
-        return {
-            "version": version,
-            "drugs": drugs
-        }
-
-    # --- All the _parse_drug and helper methods remain the same ---
-    # --- Make sure they use self.ns correctly, which is set in parse() ---
+    # --- All helper methods (_get_text, _parse_drug, etc.) should now work ---
+    # --- Make sure they consistently use self.ns ---
 
     def _get_text(self, element: etree._Element, xpath: str) -> Optional[str]:
-        """Get text content from an XML element using lxml and namespaces.
-
-        Args:
-            element: Parent XML element (lxml).
-            xpath: XPath to target element (using 'db:' prefix).
-
-        Returns:
-            Text content or None if element not found.
-        """
+        """Get text content from an XML element using lxml and namespaces."""
+        if not self.ns: # Add check if namespace is missing
+             # self.logger.warning(f"Namespace not set when trying to find {xpath}. Returning None.")
+             return None
         target = element.find(xpath, self.ns)
-        # Use .strip() to remove potential leading/trailing whitespace
         return target.text.strip() if target is not None and target.text is not None else None
 
     def _parse_list_elements(self, parent: etree._Element, xpath: str) -> List[str]:
-        """Parse list of text elements using lxml and namespaces.
-
-        Args:
-            parent: Parent XML element (lxml).
-            xpath: XPath to list elements (using 'db:' prefix).
-
-        Returns:
-            List of text values.
-        """
+        """Parse list of text elements using lxml and namespaces."""
+        if not self.ns: return [] # Add check
         elements = []
         for element in parent.findall(xpath, self.ns):
-             # Use .strip() to remove potential leading/trailing whitespace
             if element.text is not None:
                  text = element.text.strip()
-                 if text: # Add only if non-empty after stripping
+                 if text:
                      elements.append(text)
         return elements
 
     def _parse_drug(self, drug_element: etree._Element) -> Dict[str, Any]:
-        """Parse a single drug element (using lxml element)
+        """Parse a single drug element (using lxml element)"""
+        if not self.ns:
+            self.logger.error("Cannot parse drug, namespace not set.")
+            return {}
 
-        Args:
-            drug_element: XML element for a drug (lxml)
-
-        Returns:
-            Dictionary with drug data
-        """
         # Extract primary drugbank-id first
         primary_id_elem = drug_element.find("db:drugbank-id[@primary='true']", self.ns)
         if primary_id_elem is not None and primary_id_elem.text:

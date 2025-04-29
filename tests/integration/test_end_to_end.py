@@ -377,7 +377,8 @@ class TestDataFlow:
         builder.add_drug_disease_associations(sample_opentargets_data["drug_disease_associations"])
         
         # Verify associations in graph
-        edge_types = [builder.graph.edges[e]["type"] for e in builder.graph.edges()]
+        edge_types = [data["type"] for u, v, data in builder.graph.edges(data=True)]
+
         assert "treats" in edge_types
         
         # Step 4: Add drug-target associations

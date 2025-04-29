@@ -18,12 +18,12 @@ TEST_OUTPUT_DIR = Path(__file__).parent / "test_output"
 TEST_DATA_DIR.mkdir(exist_ok=True)
 TEST_OUTPUT_DIR.mkdir(exist_ok=True)
 
-@pytest.fixture
+@pytest.fixture(scope="class") 
 def test_data_dir():
     """Return the path to the test data directory"""
     return TEST_DATA_DIR
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def test_output_dir():
     """Return the path to the test output directory"""
     return TEST_OUTPUT_DIR
@@ -163,53 +163,67 @@ def sample_mesh_data():
         "version": "2025"
     }
 
+# tests/conftest.py
+
 @pytest.fixture
 def sample_opentargets_data():
     """Create a sample of OpenTargets data"""
     return {
         "drug_target_associations": [
             {
-                "drug_id": "CHEMBL1234",
-                "target_id": "ENSG00000123456",
+                # --- FIX: Use aligned IDs ---
+                "drug_id": "DB00001", # Changed from CHEMBL1234
+                "target_id": "P12345", # Changed from ENSG... to match UniProt in sample_drugbank
+                # --------------------------
                 "score": 0.8,
                 "mechanism": "inhibitor"
             }
         ],
         "target_disease_associations": [
             {
-                "target_id": "ENSG00000123456",
-                "disease_id": "EFO:0000001",
+                # --- FIX: Use aligned IDs ---
+                "target_id": "P12345", # Changed from ENSG...
+                "disease_id": "D000001", # Changed from EFO:0000001 to match sample_mesh
+                # --------------------------
                 "score": 0.7,
                 "evidence": "genetic_association"
             }
         ],
         "drug_disease_associations": [
             {
-                "drug_id": "CHEMBL1234",
-                "disease_id": "EFO:0000001",
+                # --- FIX: Use aligned IDs ---
+                "drug_id": "DB00001", # Changed from CHEMBL1234
+                "disease_id": "D000001", # Changed from EFO:0000001
+                # --------------------------
                 "score": 0.9,
                 "clinical_phase": 3
             }
         ],
         "targets": {
-            "ENSG00000123456": {
-                "id": "ENSG00000123456",
-                "name": "Test Target",
+            # --- FIX: Use aligned IDs ---
+            "P12345": {
+                "id": "P12345",
+                "name": "Test Target Polypeptide", # Name might differ slightly
                 "symbol": "TEST1"
             }
+            # --------------------------
         },
         "diseases": {
-            "EFO:0000001": {
-                "id": "EFO:0000001",
-                "name": "Test Disease"
+            # --- FIX: Use aligned IDs ---
+            "D000001": {
+                "id": "D000001",
+                "name": "Test Disease 1" # Match name from sample_mesh
             }
+            # --------------------------
         },
         "drugs": {
-            "CHEMBL1234": {
-                "id": "CHEMBL1234",
-                "name": "Test Drug",
+            # --- FIX: Use aligned IDs ---
+            "DB00001": {
+                "id": "DB00001",
+                "name": "Test Drug 1", # Match name from sample_drugbank
                 "type": "small molecule"
             }
+            # --------------------------
         }
     }
 
@@ -239,7 +253,7 @@ def sample_graph():
     return G
 
 # Create a directory with test XML files for MeSH
-@pytest.fixture
+@pytest.fixture(scope="class")
 def create_test_mesh_files(test_data_dir):
     """Create test MeSH XML files"""
     mesh_dir = test_data_dir / "mesh"
@@ -315,7 +329,7 @@ def create_test_mesh_files(test_data_dir):
     return mesh_dir
 
 # Create a directory with test parquet files for OpenTargets
-@pytest.fixture
+@pytest.fixture(scope="class")
 def create_test_opentargets_files(test_data_dir):
     """Create test OpenTargets parquet files"""
     import pyarrow as pa
@@ -344,7 +358,7 @@ def create_test_opentargets_files(test_data_dir):
     
     return ot_dir
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def create_test_drugbank_files(test_data_dir):
     """Create test DrugBank files"""
     drugbank_dir = test_data_dir / "drugbank"

@@ -25,12 +25,20 @@ class TestDrugBankVocabulary:
         test_csv = create_test_drugbank_files / "test_vocabulary.csv"
         vocab = DrugBankVocabulary(str(test_csv))
         df = vocab.load()
-        
+
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 2
-        assert list(df.columns) == ['drugbank_id', 'name', 'cas_number', 'unii', 'synonyms', 'inchikey']
+        # --- FIX: Update expected columns ---
+        expected_cols = ["drugbank_id", "accession_numbers", "name",
+                         "cas_number", "unii", "synonyms", "inchikey"]
+        assert list(df.columns) == expected_cols
+        # ------------------------------------
         assert df.iloc[0]['drugbank_id'] == 'DB00001'
         assert df.iloc[0]['name'] == 'Test Drug 1'
+        # Check that the added column is present and empty
+        assert 'accession_numbers' in df.columns
+        assert df.iloc[0]['accession_numbers'] == ''
+
     
     def test_build_mappings(self, create_test_drugbank_files):
         """Test building mappings from vocabulary data"""

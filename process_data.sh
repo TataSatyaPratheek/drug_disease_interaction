@@ -36,7 +36,7 @@ else
     --format pickle
 fi
 
-# Step 4: Build unified knowledge graph without DGL
+# Step 4: Build unified knowledge graph without PyG
 echo "Building knowledge graph..."
 python -c "
 import sys

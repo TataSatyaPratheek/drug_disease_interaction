@@ -12,6 +12,7 @@ NC='\033[0m' # No Color
 PASSED=0
 FAILED=0
 SKIPPED=0
+FAILED_TESTS=() # Initialize as an array
 
 # Print header
 echo -e "${BLUE}=========================================================${NC}"
@@ -22,15 +23,16 @@ echo
 # Create necessary directories
 echo -e "${YELLOW}Setting up test environment...${NC}"
 mkdir -p tests/test_output
-mkdir -p tests/test_data
+# mkdir -p tests/test_data # This should already exist or be managed by fixtures/git
 
 # Function to run a test and report results
 run_test() {
-    TEST_FILE=$1
+    TEST_TARGET=$1 # Can be file or file::class
     TEST_NAME=$2
-    
+
     echo -e "${YELLOW}Running test: ${TEST_NAME}${NC}"
-    if pytest $TEST_FILE -v; then
+    # Use pytest's ability to target specific files/classes/functions
+    if pytest "$TEST_TARGET" -v; then
         echo -e "${GREEN}✓ ${TEST_NAME} passed${NC}"
         PASSED=$((PASSED + 1))
     else
@@ -45,25 +47,25 @@ run_test() {
 echo -e "${BLUE}Running Unit Tests${NC}"
 echo -e "${BLUE}-----------------${NC}"
 
-# DrugBank tests
-run_test "tests/unit/data/sources/drugbank/test_vocabulary.py" "DrugBank Vocabulary Parser"
-run_test "tests/unit/data/sources/drugbank/test_xml_parser.py" "DrugBank XML Parser"
-run_test "tests/unit/data/sources/drugbank/test_integration.py" "DrugBank Integration"
+# DrugBank tests (Target specific classes within the file)
+run_test "tests/unit/data/sources/drugbank/test_vocabulary.py::TestDrugBankVocabulary" "DrugBank Vocabulary Parser"
+run_test "tests/unit/data/sources/drugbank/test_vocabulary.py::TestDrugBankXMLParser" "DrugBank XML Parser"
+run_test "tests/unit/data/sources/drugbank/test_vocabulary.py::TestDrugBankIntegrator" "DrugBank Integration"
 
 # MeSH tests
-run_test "tests/unit/data/sources/mesh/test_parser.py" "MeSH Parser"
+run_test "tests/unit/data/sources/mesh/test_mesh_parser.py" "MeSH Parser" # Use renamed file
 
 # OpenTargets tests
-run_test "tests/unit/data/sources/opentargets/test_parser.py" "OpenTargets Parser"
+run_test "tests/unit/data/sources/opentargets/test_opentargets_parser.py" "OpenTargets Parser" # Use renamed file
 
 # Graph Builder tests
 run_test "tests/unit/graph/test_builder.py" "Graph Builder"
 
-# Check if DGL is available for graph conversion tests
-if python -c "import dgl" &> /dev/null; then
+# Check if PyTorch Geometric is available for graph conversion tests
+if python -c "import torch_geometric" &> /dev/null; then
     run_test "tests/unit/graph/test_conversion.py" "Graph Conversion"
 else
-    echo -e "${YELLOW}Skipping Graph Conversion tests (DGL not installed)${NC}"
+    echo -e "${YELLOW}Skipping Graph Conversion tests (PyTorch Geometric not installed)${NC}"
     SKIPPED=$((SKIPPED + 1))
 fi
 
@@ -71,8 +73,10 @@ fi
 echo -e "${BLUE}Running Integration Tests${NC}"
 echo -e "${BLUE}------------------------${NC}"
 
-run_test "tests/integration/test_data_flow.py" "Data Flow Tests"
-run_test "tests/integration/test_end_to_end.py" "End-to-End Tests"
+# Target specific classes within the integration test file
+run_test "tests/integration/test_end_to_end.py::TestDataFlow" "Data Flow Tests"
+run_test "tests/integration/test_end_to_end.py::TestEndToEnd" "End-to-End Tests"
+
 
 # Print summary
 echo -e "${BLUE}=========================================================${NC}"

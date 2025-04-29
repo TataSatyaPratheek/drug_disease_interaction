@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--opentargets", help="Path to OpenTargets associations")
     parser.add_argument("--output", required=True, help="Output directory for graph")
     parser.add_argument("--log_file", help="Path to log file")
-    parser.add_argument("--formats", default="graphml,pickle,dgl", help="Comma-separated list of output formats")
+    parser.add_argument("--formats", default="graphml,pickle,pyg", help="Comma-separated list of output formats")
     args = parser.parse_args()
     
     # Set up logging
