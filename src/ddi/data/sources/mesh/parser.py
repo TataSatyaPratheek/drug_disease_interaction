@@ -46,117 +46,145 @@ class MeSHParser:
         """
         self.logger.info(f"Parsing descriptor file: {file_path}")
         
-        # Parse XML file
         try:
-            tree = ET.parse(file_path)
-            root = tree.getroot()
+            # Try to parse the file using standard XML parsing
+            try:
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+            except ET.ParseError:
+                # If standard parsing fails, try with more permissive parsing
+                self.logger.warning(f"Standard XML parsing failed, trying alternative method for {file_path}")
+                
+                # Use lxml if available (more permissive XML parser)
+                try:
+                    from lxml import etree
+                    parser = etree.XMLParser(recover=True)
+                    tree = etree.parse(file_path, parser)
+                    root = tree.getroot()
+                except ImportError:
+                    # If lxml not available, read file manually and fix common issues
+                    self.logger.warning("lxml not available, trying manual parsing")
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        xml_content = f.read()
+                    
+                    # Replace problematic characters
+                    xml_content = xml_content.replace('&', '&amp;')
+                    
+                    # Parse fixed content
+                    root = ET.fromstring(xml_content)
+            
+            # Extract descriptor records
+            descriptor_records = root.findall(".//DescriptorRecord")
+            
+            if limit:
+                descriptor_records = descriptor_records[:limit]
+                
+            self.logger.info(f"Found {len(descriptor_records)} descriptor records")
+            
+            # Process descriptor records
+            for record in tqdm(descriptor_records, desc="Processing descriptor records"):
+                try:
+                    # Extract descriptor UI
+                    descriptor_ui = record.find("./DescriptorUI")
+                    if descriptor_ui is None:
+                        continue
+                        
+                    descriptor_id = descriptor_ui.text
+                    
+                    # Extract descriptor name
+                    descriptor_name_elem = record.find("./DescriptorName/String")
+                    if descriptor_name_elem is None:
+                        continue
+                        
+                    descriptor_name = descriptor_name_elem.text
+                    
+                    # Extract tree numbers
+                    tree_numbers = []
+                    tree_number_list = record.find("./TreeNumberList")
+                    if tree_number_list is not None:
+                        for tree_elem in tree_number_list.findall("./TreeNumber"):
+                            if tree_elem.text:
+                                tree_numbers.append(tree_elem.text)
+                    
+                    # Check if this is a disease category
+                    is_disease = False
+                    for tree_number in tree_numbers:
+                        category = tree_number.split('.')[0] if '.' in tree_number else tree_number
+                        if category in self.disease_categories:
+                            is_disease = True
+                            break
+                    
+                    # Skip if not a disease and not a main category
+                    if not is_disease and all(tn not in self.disease_categories for tn in tree_numbers):
+                        continue
+                    
+                    # Extract scope note (description)
+                    scope_note = None
+                    scope_note_elem = record.find("./ScopeNote")
+                    if scope_note_elem is not None:
+                        scope_note = scope_note_elem.text
+                    
+                    # Extract synonyms (terms)
+                    synonyms = []
+                    concept_list = record.find("./ConceptList")
+                    if concept_list is not None:
+                        for concept in concept_list.findall("./Concept"):
+                            term_list = concept.find("./TermList")
+                            if term_list is not None:
+                                for term in term_list.findall("./Term"):
+                                    term_string = term.find("./String")
+                                    if term_string is not None and term_string.text:
+                                        synonyms.append(term_string.text)
+                    
+                    # Extract allowed qualifiers
+                    allowed_qualifiers = []
+                    qualifier_list = record.find("./AllowableQualifierList")
+                    if qualifier_list is not None:
+                        for qualifier in qualifier_list.findall("./AllowableQualifier"):
+                            qualifier_ref = qualifier.find("./QualifierReferredTo/QualifierUI")
+                            if qualifier_ref is not None and qualifier_ref.text:
+                                allowed_qualifiers.append(qualifier_ref.text)
+                    
+                    # Store descriptor data
+                    self.descriptors[descriptor_id] = {
+                        "id": descriptor_id,
+                        "name": descriptor_name,
+                        "tree_numbers": tree_numbers,
+                        "description": scope_note,
+                        "synonyms": list(set(synonyms)),  # Remove duplicates
+                        "allowed_qualifiers": allowed_qualifiers,
+                        "is_disease": is_disease
+                    }
+                    
+                    # Update term to ID mapping
+                    self.term_to_id[descriptor_name.lower()] = descriptor_id
+                    for synonym in synonyms:
+                        if synonym.lower() not in self.term_to_id:
+                            self.term_to_id[synonym.lower()] = descriptor_id
+                    
+                    # Update disease hierarchy
+                    for tree_number in tree_numbers:
+                        parts = tree_number.split('.')
+                        for i in range(1, len(parts)):
+                            parent = '.'.join(parts[:i])
+                            child = '.'.join(parts[:i+1])
+                            
+                            if parent not in self.disease_hierarchy:
+                                self.disease_hierarchy[parent] = []
+                                
+                            if child not in self.disease_hierarchy[parent]:
+                                self.disease_hierarchy[parent].append(child)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Error processing descriptor record: {str(e)}")
+                    continue
+            
+            self.logger.info(f"Processed {len(self.descriptors)} descriptor records")
+            return self.descriptors
+            
         except Exception as e:
             self.logger.error(f"Error parsing XML file {file_path}: {str(e)}")
             return {}
-        
-        # Extract descriptor records
-        descriptor_records = root.findall(".//DescriptorRecord")
-        
-        if limit:
-            descriptor_records = descriptor_records[:limit]
-            
-        self.logger.info(f"Found {len(descriptor_records)} descriptor records")
-        
-        # Process descriptor records
-        for record in tqdm(descriptor_records, desc="Processing descriptor records"):
-            try:
-                # Extract descriptor UI
-                descriptor_ui = record.find("./DescriptorUI")
-                if descriptor_ui is None:
-                    continue
-                    
-                descriptor_id = descriptor_ui.text
-                
-                # Extract descriptor name
-                descriptor_name_elem = record.find("./DescriptorName/String")
-                if descriptor_name_elem is None:
-                    continue
-                    
-                descriptor_name = descriptor_name_elem.text
-                
-                # Extract tree numbers
-                tree_numbers = []
-                tree_number_elems = record.findall("./TreeNumberList/TreeNumber")
-                for tree_elem in tree_number_elems:
-                    if tree_elem.text:
-                        tree_numbers.append(tree_elem.text)
-                
-                # Check if this is a disease category
-                is_disease = False
-                for tree_number in tree_numbers:
-                    category = tree_number.split('.')[0] if '.' in tree_number else tree_number
-                    if category in self.disease_categories:
-                        is_disease = True
-                        break
-                
-                # Skip if not a disease and not a main category
-                if not is_disease and all(tn not in self.disease_categories for tn in tree_numbers):
-                    continue
-                
-                # Extract scope note (description)
-                scope_note = None
-                scope_note_elem = record.find("./ScopeNote")
-                if scope_note_elem is not None:
-                    scope_note = scope_note_elem.text
-                
-                # Extract synonyms (terms)
-                synonyms = []
-                concept_elems = record.findall("./ConceptList/Concept")
-                for concept in concept_elems:
-                    term_elems = concept.findall("./TermList/Term")
-                    for term in term_elems:
-                        term_string = term.find("./String")
-                        if term_string is not None and term_string.text:
-                            synonyms.append(term_string.text)
-                
-                # Extract allowed qualifiers
-                allowed_qualifiers = []
-                qualifier_elems = record.findall("./AllowableQualifierList/AllowableQualifier/QualifierReferredTo/QualifierUI")
-                for qualifier in qualifier_elems:
-                    if qualifier.text:
-                        allowed_qualifiers.append(qualifier.text)
-                
-                # Store descriptor data
-                self.descriptors[descriptor_id] = {
-                    "id": descriptor_id,
-                    "name": descriptor_name,
-                    "tree_numbers": tree_numbers,
-                    "description": scope_note,
-                    "synonyms": list(set(synonyms)),  # Remove duplicates
-                    "allowed_qualifiers": allowed_qualifiers,
-                    "is_disease": is_disease
-                }
-                
-                # Update term to ID mapping
-                self.term_to_id[descriptor_name.lower()] = descriptor_id
-                for synonym in synonyms:
-                    if synonym.lower() not in self.term_to_id:
-                        self.term_to_id[synonym.lower()] = descriptor_id
-                
-                # Update disease hierarchy
-                for tree_number in tree_numbers:
-                    parts = tree_number.split('.')
-                    for i in range(1, len(parts)):
-                        parent = '.'.join(parts[:i])
-                        child = '.'.join(parts[:i+1])
-                        
-                        if parent not in self.disease_hierarchy:
-                            self.disease_hierarchy[parent] = []
-                            
-                        if child not in self.disease_hierarchy[parent]:
-                            self.disease_hierarchy[parent].append(child)
-                
-            except Exception as e:
-                self.logger.warning(f"Error processing descriptor record: {str(e)}")
-                continue
-        
-        self.logger.info(f"Processed {len(self.descriptors)} descriptor records")
-        return self.descriptors
     
     def parse_qualifier_file(self, file_path: str) -> Dict[str, Any]:
         """Parse MeSH qualifier XML file
@@ -169,62 +197,86 @@ class MeSHParser:
         """
         self.logger.info(f"Parsing qualifier file: {file_path}")
         
-        # Parse XML file
         try:
-            tree = ET.parse(file_path)
-            root = tree.getroot()
+            # Try to parse the file using standard XML parsing
+            try:
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+            except ET.ParseError:
+                # If standard parsing fails, try with more permissive parsing
+                self.logger.warning(f"Standard XML parsing failed, trying alternative method for {file_path}")
+                
+                # Use lxml if available (more permissive XML parser)
+                try:
+                    from lxml import etree
+                    parser = etree.XMLParser(recover=True)
+                    tree = etree.parse(file_path, parser)
+                    root = tree.getroot()
+                except ImportError:
+                    # If lxml not available, read file manually and fix common issues
+                    self.logger.warning("lxml not available, trying manual parsing")
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        xml_content = f.read()
+                    
+                    # Replace problematic characters
+                    xml_content = xml_content.replace('&', '&amp;')
+                    
+                    # Parse fixed content
+                    root = ET.fromstring(xml_content)
+            
+            # Extract qualifier records
+            qualifier_records = root.findall(".//QualifierRecord")
+            self.logger.info(f"Found {len(qualifier_records)} qualifier records")
+            
+            # Process qualifier records
+            for record in tqdm(qualifier_records, desc="Processing qualifier records"):
+                try:
+                    # Extract qualifier UI
+                    qualifier_ui = record.find("./QualifierUI")
+                    if qualifier_ui is None:
+                        continue
+                        
+                    qualifier_id = qualifier_ui.text
+                    
+                    # Extract qualifier name
+                    qualifier_name_elem = record.find("./QualifierName/String")
+                    if qualifier_name_elem is None:
+                        continue
+                        
+                    qualifier_name = qualifier_name_elem.text
+                    
+                    # Extract tree numbers
+                    tree_numbers = []
+                    tree_number_list = record.find("./TreeNumberList")
+                    if tree_number_list is not None:
+                        for tree_elem in tree_number_list.findall("./TreeNumber"):
+                            if tree_elem.text:
+                                tree_numbers.append(tree_elem.text)
+                    
+                    # Extract scope note (description)
+                    scope_note = None
+                    scope_note_elem = record.find("./ScopeNote")
+                    if scope_note_elem is not None:
+                        scope_note = scope_note_elem.text
+                    
+                    # Store qualifier data
+                    self.qualifiers[qualifier_id] = {
+                        "id": qualifier_id,
+                        "name": qualifier_name,
+                        "tree_numbers": tree_numbers,
+                        "description": scope_note
+                    }
+                    
+                except Exception as e:
+                    self.logger.warning(f"Error processing qualifier record: {str(e)}")
+                    continue
+            
+            self.logger.info(f"Processed {len(self.qualifiers)} qualifier records")
+            return self.qualifiers
+            
         except Exception as e:
             self.logger.error(f"Error parsing XML file {file_path}: {str(e)}")
             return {}
-        
-        # Extract qualifier records
-        qualifier_records = root.findall(".//QualifierRecord")
-        self.logger.info(f"Found {len(qualifier_records)} qualifier records")
-        
-        # Process qualifier records
-        for record in tqdm(qualifier_records, desc="Processing qualifier records"):
-            try:
-                # Extract qualifier UI
-                qualifier_ui = record.find("./QualifierUI")
-                if qualifier_ui is None:
-                    continue
-                    
-                qualifier_id = qualifier_ui.text
-                
-                # Extract qualifier name
-                qualifier_name_elem = record.find("./QualifierName/String")
-                if qualifier_name_elem is None:
-                    continue
-                    
-                qualifier_name = qualifier_name_elem.text
-                
-                # Extract tree numbers
-                tree_numbers = []
-                tree_number_elems = record.findall("./TreeNumberList/TreeNumber")
-                for tree_elem in tree_number_elems:
-                    if tree_elem.text:
-                        tree_numbers.append(tree_elem.text)
-                
-                # Extract scope note (description)
-                scope_note = None
-                scope_note_elem = record.find("./ScopeNote")
-                if scope_note_elem is not None:
-                    scope_note = scope_note_elem.text
-                
-                # Store qualifier data
-                self.qualifiers[qualifier_id] = {
-                    "id": qualifier_id,
-                    "name": qualifier_name,
-                    "tree_numbers": tree_numbers,
-                    "description": scope_note
-                }
-                
-            except Exception as e:
-                self.logger.warning(f"Error processing qualifier record: {str(e)}")
-                continue
-        
-        self.logger.info(f"Processed {len(self.qualifiers)} qualifier records")
-        return self.qualifiers
     
     def parse_latest_mesh(self, limit: Optional[int] = None) -> Dict[str, Any]:
         """Parse the latest MeSH data

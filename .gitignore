@@ -30,6 +30,8 @@ data/external/
 data/graph/
 models/
 outputs/
+tests/test_data/
+tests/test_output/
 
 # Jupyter Notebooks
 .ipynb_checkpoints

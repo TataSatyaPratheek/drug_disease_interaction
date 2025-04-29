@@ -31,25 +31,46 @@ class DrugBankVocabulary:
         """
         self.logger.info(f"Loading DrugBank vocabulary from {self.csv_path}")
         
-        self.data = pd.read_csv(self.csv_path)
-        
-        # Rename columns to standardized names if necessary
-        if "DrugBank ID" in self.data.columns:
-            self.data = self.data.rename(columns={
-                "DrugBank ID": "drugbank_id",
-                "Accession Numbers": "accession_numbers",
-                "Common name": "name",
-                "CAS": "cas_number",
-                "UNII": "unii",
-                "Synonyms": "synonyms",
-                "Standard InChI Key": "inchikey"
-            })
-        
-        # Build mappings for lookups
-        self._build_mappings()
-        
-        self.logger.info(f"Loaded {len(self.data)} entries from vocabulary")
-        return self.data
+        # Read CSV with string type enforced for text columns
+        try:
+            self.data = pd.read_csv(
+                self.csv_path, 
+                dtype={
+                    'DrugBank ID': str,
+                    'Common name': str,
+                    'CAS': str,
+                    'UNII': str,
+                    'Synonyms': str,
+                    'Standard InChI Key': str
+                }
+            )
+            
+            # Rename columns to standardized names if necessary
+            if "DrugBank ID" in self.data.columns:
+                self.data = self.data.rename(columns={
+                    "DrugBank ID": "drugbank_id",
+                    "Accession Numbers": "accession_numbers",
+                    "Common name": "name",
+                    "CAS": "cas_number",
+                    "UNII": "unii",
+                    "Synonyms": "synonyms",
+                    "Standard InChI Key": "inchikey"
+                })
+            
+            # Build mappings for lookups
+            self._build_mappings()
+            
+            self.logger.info(f"Loaded {len(self.data)} entries from vocabulary")
+            return self.data
+            
+        except Exception as e:
+            self.logger.error(f"Error loading vocabulary CSV: {str(e)}")
+            # Initialize empty DataFrame with expected columns to prevent further errors
+            self.data = pd.DataFrame(columns=[
+                "drugbank_id", "accession_numbers", "name", 
+                "cas_number", "unii", "synonyms", "inchikey"
+            ])
+            return self.data
     
     def _build_mappings(self) -> None:
         """Build mapping dictionaries for efficient lookups"""
@@ -58,24 +79,41 @@ class DrugBankVocabulary:
             return
         
         # Map DrugBank ID to row index
-        self.id_mapping = {row.drugbank_id: idx for idx, row in self.data.iterrows()}
+        self.id_mapping = {}
+        for idx, row in self.data.iterrows():
+            if pd.notna(row.drugbank_id):
+                self.id_mapping[row.drugbank_id] = idx
         
         # Map CAS number to DrugBank ID
+        self.cas_to_id = {}
         for idx, row in self.data.iterrows():
             if pd.notna(row.cas_number) and row.cas_number:
                 self.cas_to_id[row.cas_number] = row.drugbank_id
                 
         # Map name to DrugBank ID (case-insensitive)
+        self.name_to_id = {}
         for idx, row in self.data.iterrows():
             if pd.notna(row.name) and row.name:
-                self.name_to_id[row.name.lower()] = row.drugbank_id
+                try:
+                    # Ensure name is a string before calling lower()
+                    if isinstance(row.name, str):
+                        self.name_to_id[row.name.lower()] = row.drugbank_id
+                    else:
+                        # Convert to string if it's not already
+                        name_str = str(row.name).lower()
+                        self.name_to_id[name_str] = row.drugbank_id
+                        self.logger.warning(f"Name '{row.name}' was not a string, converted to '{name_str}'")
+                except Exception as e:
+                    self.logger.warning(f"Error processing name '{row.name}': {str(e)}")
                 
         # Map InChI Key to DrugBank ID
+        self.inchi_to_id = {}
         for idx, row in self.data.iterrows():
             if pd.notna(row.inchikey) and row.inchikey:
                 self.inchi_to_id[row.inchikey] = row.drugbank_id
                 
         # Map UNII to DrugBank ID
+        self.unii_to_id = {}
         for idx, row in self.data.iterrows():
             if pd.notna(row.unii) and row.unii:
                 self.unii_to_id[row.unii] = row.drugbank_id
@@ -83,11 +121,16 @@ class DrugBankVocabulary:
         # Parse and map synonyms
         for idx, row in self.data.iterrows():
             if pd.notna(row.synonyms) and row.synonyms:
-                for synonym in row.synonyms.split('|'):
-                    # Use lowercase for case-insensitive mapping
-                    # Don't overwrite existing primary names
-                    if synonym.lower() not in self.name_to_id:
-                        self.name_to_id[synonym.lower()] = row.drugbank_id
+                try:
+                    # Split synonyms by pipe character
+                    if isinstance(row.synonyms, str):
+                        for synonym in row.synonyms.split('|'):
+                            # Use lowercase for case-insensitive mapping
+                            # Don't overwrite existing primary names
+                            if synonym.lower() not in self.name_to_id:
+                                self.name_to_id[synonym.lower()] = row.drugbank_id
+                except Exception as e:
+                    self.logger.warning(f"Error processing synonyms for drug {row.drugbank_id}: {str(e)}")
     
     def get_drug_by_id(self, drugbank_id: str) -> Optional[Dict[str, Any]]:
         """Get drug information by DrugBank ID
@@ -104,15 +147,22 @@ class DrugBankVocabulary:
         idx = self.id_mapping[drugbank_id]
         row = self.data.iloc[idx]
         
-        return {
-            "drugbank_id": row.drugbank_id,
-            "accession_numbers": row.accession_numbers,
-            "name": row.name,
-            "cas_number": row.cas_number,
-            "unii": row.unii,
-            "synonyms": row.synonyms.split('|') if pd.notna(row.synonyms) else [],
-            "inchikey": row.inchikey
-        }
+        try:
+            return {
+                "drugbank_id": row.drugbank_id,
+                "accession_numbers": row.accession_numbers if pd.notna(row.accession_numbers) else None,
+                "name": row.name if pd.notna(row.name) else None,
+                "cas_number": row.cas_number if pd.notna(row.cas_number) else None,
+                "unii": row.unii if pd.notna(row.unii) else None,
+                "synonyms": row.synonyms.split('|') if pd.notna(row.synonyms) else [],
+                "inchikey": row.inchikey if pd.notna(row.inchikey) else None
+            }
+        except Exception as e:
+            self.logger.warning(f"Error retrieving drug {drugbank_id}: {str(e)}")
+            return {
+                "drugbank_id": drugbank_id,
+                "name": drugbank_id  # Fallback to using ID as name
+            }
     
     def get_id_by_name(self, name: str) -> Optional[str]:
         """Get DrugBank ID by drug name (case-insensitive)
@@ -123,7 +173,14 @@ class DrugBankVocabulary:
         Returns:
             DrugBank ID or None if not found
         """
-        return self.name_to_id.get(name.lower())
+        try:
+            return self.name_to_id.get(name.lower())
+        except:
+            # Handle case where name is not a string
+            try:
+                return self.name_to_id.get(str(name).lower())
+            except:
+                return None
     
     def get_id_by_cas(self, cas: str) -> Optional[str]:
         """Get DrugBank ID by CAS number
@@ -216,6 +273,7 @@ def main():
     parser = argparse.ArgumentParser(description="Process DrugBank vocabulary CSV")
     parser.add_argument("--input", required=True, help="Path to drugbank_all_drugbank_vocabulary.csv")
     parser.add_argument("--query", help="DrugBank ID to look up")
+    parser.add_argument("--output", help="Path to save processed vocabulary (optional)")
     args = parser.parse_args()
     
     # Set up logging
@@ -230,6 +288,13 @@ def main():
     
     logging.info(f"Loaded {len(data)} entries from vocabulary")
     
+    # Show column information
+    logging.info("Column info:")
+    for col in data.columns:
+        dtype = data[col].dtype
+        non_null = data[col].count()
+        logging.info(f"  - {col}: {dtype}, {non_null}/{len(data)} non-null values")
+    
     # Query specific drug if requested
     if args.query:
         drug = vocabulary.get_drug_by_id(args.query)
@@ -238,6 +303,19 @@ def main():
                 logging.info(f"{key}: {value}")
         else:
             logging.warning(f"Drug {args.query} not found in vocabulary")
+    
+    # Save processed vocabulary if output path provided
+    if args.output:
+        import pickle
+        with open(args.output, 'wb') as f:
+            pickle.dump({
+                'data': data,
+                'id_mapping': vocabulary.id_mapping,
+                'name_to_id': vocabulary.name_to_id,
+                'cas_to_id': vocabulary.cas_to_id,
+                'inchi_to_id': vocabulary.inchi_to_id
+            }, f)
+        logging.info(f"Saved processed vocabulary to {args.output}")
 
 if __name__ == "__main__":
     main()
