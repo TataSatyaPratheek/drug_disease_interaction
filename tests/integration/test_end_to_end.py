@@ -11,8 +11,8 @@ import sys
 from src.ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
 from src.ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
 from src.ddi.data.sources.drugbank.integration import DrugBankIntegrator
-from src.ddi.data.sources.mesh.parser import MeSHParser
-from src.ddi.data.sources.opentargets.parser import OpenTargetsParser
+from ddi.parser.mesh_parser import MeSHParser
+from ddi.parser.open_targets_parser import OpenTargetsParser
 from src.ddi.graph.builder import KnowledgeGraphBuilder
 
 class TestEndToEnd:

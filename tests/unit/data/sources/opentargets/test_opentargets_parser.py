@@ -5,7 +5,7 @@ import pickle
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from src.ddi.data.sources.opentargets.parser import OpenTargetsParser
+from ddi.parser.open_targets_parser import OpenTargetsParser
 
 class TestOpenTargetsParser:
     """Test the OpenTargetsParser class"""

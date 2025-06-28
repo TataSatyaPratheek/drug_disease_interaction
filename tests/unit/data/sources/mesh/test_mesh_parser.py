@@ -4,7 +4,7 @@ import os
 import pickle
 import json
 from pathlib import Path
-from src.ddi.data.sources.mesh.parser import MeSHParser
+from ddi.parser.mesh_parser import MeSHParser
 
 class TestMeSHParser:
     """Test the MeSHParser class"""
