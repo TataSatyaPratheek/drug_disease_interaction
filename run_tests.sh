@@ -61,6 +61,12 @@ run_test "tests/unit/data/sources/opentargets/test_opentargets_parser.py" "OpenT
 # Graph Builder tests
 run_test "tests/unit/graph/test_builder.py" "Graph Builder"
 
+# Graph Analysis tests
+run_test "tests/unit/analysis/test_graph_analysis.py" "Graph Analysis"
+
+# Graph Visualization tests
+run_test "tests/unit/visualization/test_graph_viz.py" "Graph Visualization"
+
 # Check if PyTorch Geometric is available for graph conversion tests
 if python -c "import torch_geometric" &> /dev/null; then
     run_test "tests/unit/graph/test_conversion.py" "Graph Conversion"
