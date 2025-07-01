@@ -1,263 +1,91 @@
 # src/graphrag/core/vector_store.py
-import chromadb
-from chromadb.config import Settings
+import weaviate
+from weaviate.classes.config import Configure, Property, DataType
+from weaviate.classes.data import DataObject
+from weaviate.classes.query import MetadataQuery, Filter
 import pandas as pd
 import networkx as nx
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 import json
 import logging
-from ..generators.llm_client import EmbeddingClient
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
-class GraphVectorStore:
-    """Vector store for efficient graph entity and relationship retrieval"""
+class WeaviateGraphStore:
+    """Weaviate v4-based vector store optimized for drug-disease knowledge graphs"""
     
     def __init__(self, 
-                 persist_directory: str = "data/vectorstore",
-                 collection_name: str = "drug_disease_graph"):
-        
+             persist_directory: str = "data/weaviate_db",
+             embedding_model: str = "all-MiniLM-L6-v2"):
+    
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         
-        # Initialize ChromaDB
-        self.client = chromadb.PersistentClient(
-            path=str(self.persist_directory),
-            settings=Settings(anonymized_telemetry=False)
-        )
-        
-        self.collection_name = collection_name
-        self.collection = None
-        self.embedding_client = EmbeddingClient()
-        self.logger = logging.getLogger(__name__)
-    
-    def initialize_from_graph(self, graph: nx.MultiDiGraph, force_rebuild: bool = False):
-        """Initialize vector store from NetworkX graph"""
-        
-        # Check if collection exists
+        # Try to connect to existing Weaviate instance first, fallback to embedded
         try:
-            if force_rebuild:
-                self.client.delete_collection(self.collection_name)
-            
-            self.collection = self.client.get_collection(self.collection_name)
-            self.logger.info(f"Loaded existing collection with {self.collection.count()} items")
-            return
-            
-        except:
-            # Collection doesn't exist, create it
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
-                metadata={"description": "Drug-disease knowledge graph entities"}
-            )
-        
-        self.logger.info("Building vector store from graph...")
-        self._index_graph_entities(graph)
-        self._index_graph_relationships(graph)
-        self.logger.info(f"Vector store built with {self.collection.count()} items")
-    
-    def _index_graph_entities(self, graph: nx.MultiDiGraph):
-        """Index all graph entities with their descriptions"""
-        
-        documents = []
-        metadatas = []
-        ids = []
-        
-        for node_id, data in graph.nodes(data=True):
-            # Create searchable text description
-            text_parts = []
-            
-            name = data.get('name', node_id)
-            node_type = data.get('type', 'unknown')
-            text_parts.append(f"{name} ({node_type})")
-            
-            # Add specific attributes based on node type
-            if node_type == 'drug':
-                if data.get('description'):
-                    text_parts.append(data['description'][:500])
-                if data.get('indication'):
-                    text_parts.append(f"Indication: {data['indication']}")
-                if data.get('mechanism_of_action'):
-                    text_parts.append(f"Mechanism: {data['mechanism_of_action']}")
-                if data.get('synonyms'):
-                    text_parts.append(f"Also known as: {', '.join(data['synonyms'][:5])}")
-            
-            elif node_type == 'disease':
-                if data.get('annotation'):
-                    text_parts.append(data['annotation'])
-                if data.get('tree_numbers'):
-                    text_parts.append(f"Classification: {', '.join(data['tree_numbers'][:3])}")
-            
-            elif node_type in ['protein', 'polypeptide']:
-                if data.get('gene_name'):
-                    text_parts.append(f"Gene: {data['gene_name']}")
-                if data.get('function'):
-                    text_parts.append(f"Function: {data['function']}")
-            
-            document = " | ".join(text_parts)
-            documents.append(document)
-            
-            metadata = {
-                "node_id": node_id,
-                "name": name,
-                "type": node_type,
-                "degree": graph.degree(node_id)
-            }
-            metadatas.append(metadata)
-            ids.append(f"node_{node_id}")
-        
-        # Add to collection in batches
-        batch_size = 1000
-        for i in range(0, len(documents), batch_size):
-            batch_docs = documents[i:i+batch_size]
-            batch_metas = metadatas[i:i+batch_size]
-            batch_ids = ids[i:i+batch_size]
-            
-            self.collection.add(
-                documents=batch_docs,
-                metadatas=batch_metas,
-                ids=batch_ids
-            )
-    
-    def _index_graph_relationships(self, graph: nx.MultiDiGraph):
-        """Index important graph relationships"""
-        
-        documents = []
-        metadatas = []
-        ids = []
-        
-        relationship_count = 0
-        
-        for source, target, key, data in graph.edges(data=True, keys=True):
-            edge_type = data.get('type', 'unknown')
-            
-            # Create relationship description
-            source_name = graph.nodes[source].get('name', source)
-            target_name = graph.nodes[target].get('name', target)
-            source_type = graph.nodes[source].get('type', 'unknown')
-            target_type = graph.nodes[target].get('type', 'unknown')
-            
-            if edge_type == 'targets':
-                doc = f"{source_name} (drug) targets {target_name} (protein)"
-            elif edge_type == 'associated_with':
-                doc = f"{target_name} (disease) is associated with {source_name} (protein)"
-            else:
-                doc = f"{source_name} ({source_type}) {edge_type} {target_name} ({target_type})"
-            
-            # Add edge attributes if available
-            if data.get('actions'):
-                doc += f" | Actions: {data['actions']}"
-            if data.get('score'):
-                doc += f" | Score: {data['score']}"
-            
-            documents.append(doc)
-            
-            metadata = {
-                "source_id": source,
-                "target_id": target,
-                "source_name": source_name,
-                "target_name": target_name,
-                "source_type": source_type,
-                "target_type": target_type,
-                "edge_type": edge_type,
-                "edge_key": str(key)
-            }
-            metadatas.append(metadata)
-            ids.append(f"edge_{source}_{target}_{key}")
-            
-            relationship_count += 1
-            
-            # Limit relationships to avoid memory issues
-            if relationship_count >= 50000:
-                break
-        
-        # Add relationships in batches
-        batch_size = 1000
-        for i in range(0, len(documents), batch_size):
-            batch_docs = documents[i:i+batch_size]
-            batch_metas = metadatas[i:i+batch_size]
-            batch_ids = ids[i:i+batch_size]
-            
-            self.collection.add(
-                documents=batch_docs,
-                metadatas=batch_metas,
-                ids=batch_ids
-            )
-    
-    def search_entities(self, 
-                       query: str, 
-                       entity_types: List[str] = None,
-                       n_results: int = 10) -> List[Dict[str, Any]]:
-        """Search for entities using vector similarity"""
-        
-        if not self.collection:
-            return []
-        
-        where_clause = {}
-        if entity_types:
-            where_clause["type"] = {"$in": entity_types}
-        
-        try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=n_results,
-                where=where_clause if where_clause else None
-            )
-            
-            entities = []
-            for i, doc in enumerate(results['documents'][0]):
-                metadata = results['metadatas'][0][i]
-                distance = results['distances'][0][i]
-                
-                if metadata.get('node_id'):  # It's an entity, not a relationship
-                    entities.append({
-                        'id': metadata['node_id'],
-                        'name': metadata['name'],
-                        'type': metadata['type'],
-                        'description': doc,
-                        'similarity_score': 1 - distance,
-                        'degree': metadata.get('degree', 0)
-                    })
-            
-            return entities
-            
+            # First, try connecting to existing local instance
+            self.client = weaviate.connect_to_local(port=8080, grpc_port=50051)
+            self.logger.info("Connected to existing Weaviate instance on ports 8080/50051")
         except Exception as e:
-            self.logger.error(f"Error searching entities: {e}")
-            return []
+            try:
+                # Fallback: Start embedded Weaviate
+                self.client = weaviate.connect_to_embedded(
+                    port=8080,
+                    grpc_port=50051,
+                    persistence_data_path=str(self.persist_directory),
+                    binary_path=str(self.persist_directory / "weaviate"),
+                    version="1.25.0"
+                )
+                self.logger.info("Started new embedded Weaviate instance")
+            except Exception as e2:
+                self.logger.error(f"Failed to connect to both existing and embedded Weaviate: {e2}")
+                raise
+        
+        # Initialize embedding model
+        self.embedding_model = SentenceTransformer(embedding_model)
+        self.logger = logging.getLogger(__name__)
+        
+        # Collection references (will be set during initialization)
+        self.collections = {}
+
     
     def search_relationships(self, 
-                           query: str,
-                           relationship_types: List[str] = None,
-                           n_results: int = 10) -> List[Dict[str, Any]]:
+                       query: str,
+                       relationship_types: List[str] = None,
+                       n_results: int = 10) -> List[Dict[str, Any]]:
         """Search for relationships using vector similarity"""
         
-        if not self.collection:
+        if "Relationship" not in self.collections:
             return []
         
-        where_clause = {}
-        if relationship_types:
-            where_clause["edge_type"] = {"$in": relationship_types}
-        
         try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=n_results,
-                where=where_clause if where_clause else None
+            collection = self.collections["Relationship"]
+            query_vector = self.embedding_model.encode(query).tolist()
+            
+            # Build where filter if relationship types specified
+            where_filter = None
+            if relationship_types:
+                where_filter = Filter.by_property("edge_type").contains_any(relationship_types)
+            
+            response = collection.query.near_vector(
+                near_vector=query_vector,
+                limit=n_results,
+                where=where_filter,
+                return_metadata=MetadataQuery(distance=True),
+                return_properties=["source_id", "target_id", "source_name", "target_name", "edge_type"]
             )
             
             relationships = []
-            for i, doc in enumerate(results['documents'][0]):
-                metadata = results['metadatas'][0][i]
-                distance = results['distances'][0][i]
-                
-                if metadata.get('source_id'):  # It's a relationship
-                    relationships.append({
-                        'source_id': metadata['source_id'],
-                        'target_id': metadata['target_id'],
-                        'source_name': metadata['source_name'],
-                        'target_name': metadata['target_name'],
-                        'edge_type': metadata['edge_type'],
-                        'description': doc,
-                        'similarity_score': 1 - distance
-                    })
+            for obj in response.objects:
+                relationships.append({
+                    'source_id': obj.properties['source_id'],
+                    'target_id': obj.properties['target_id'],
+                    'source_name': obj.properties['source_name'],
+                    'target_name': obj.properties['target_name'],
+                    'edge_type': obj.properties['edge_type'],
+                    'similarity_score': 1 - obj.metadata.distance
+                })
             
             return relationships
             
@@ -265,13 +93,368 @@ class GraphVectorStore:
             self.logger.error(f"Error searching relationships: {e}")
             return []
     
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get vector store statistics"""
-        if not self.collection:
-            return {}
+    def initialize_from_graph(self, graph: nx.MultiDiGraph, force_rebuild: bool = False):
+        """Initialize Weaviate store from NetworkX graph"""
         
-        return {
-            "total_items": self.collection.count(),
-            "collection_name": self.collection_name,
-            "persist_directory": str(self.persist_directory)
+        try:
+            # Define collections using CORRECT v4 API
+            collection_configs = {
+                "Drug": {
+                    "name": "Drug",
+                    "properties": [
+                        Property(name="node_id", data_type=DataType.TEXT),
+                        Property(name="name", data_type=DataType.TEXT),
+                        Property(name="description", data_type=DataType.TEXT),
+                        Property(name="indication", data_type=DataType.TEXT),
+                        Property(name="mechanism_of_action", data_type=DataType.TEXT),
+                        Property(name="synonyms", data_type=DataType.TEXT_ARRAY),
+                        Property(name="degree", data_type=DataType.INT),
+                        Property(name="drugbank_id", data_type=DataType.TEXT),
+                    ],
+                    "vectorizer_config": Configure.Vectorizer.none()
+                },
+                "Disease": {
+                    "name": "Disease",
+                    "properties": [
+                        Property(name="node_id", data_type=DataType.TEXT),
+                        Property(name="name", data_type=DataType.TEXT),
+                        Property(name="annotation", data_type=DataType.TEXT),
+                        Property(name="tree_numbers", data_type=DataType.TEXT_ARRAY),
+                        Property(name="degree", data_type=DataType.INT),
+                        Property(name="mesh_id", data_type=DataType.TEXT),
+                    ],
+                    "vectorizer_config": Configure.Vectorizer.none()
+                },
+                "Protein": {
+                    "name": "Protein",
+                    "properties": [
+                        Property(name="node_id", data_type=DataType.TEXT),
+                        Property(name="name", data_type=DataType.TEXT),
+                        Property(name="gene_name", data_type=DataType.TEXT),
+                        Property(name="function", data_type=DataType.TEXT),
+                        Property(name="degree", data_type=DataType.INT),
+                        Property(name="uniprot_id", data_type=DataType.TEXT),
+                    ],
+                    "vectorizer_config": Configure.Vectorizer.none()
+                },
+                "Relationship": {
+                    "name": "Relationship",
+                    "properties": [
+                        Property(name="source_id", data_type=DataType.TEXT),
+                        Property(name="target_id", data_type=DataType.TEXT),
+                        Property(name="source_name", data_type=DataType.TEXT),
+                        Property(name="target_name", data_type=DataType.TEXT),
+                        Property(name="source_type", data_type=DataType.TEXT),
+                        Property(name="target_type", data_type=DataType.TEXT),
+                        Property(name="edge_type", data_type=DataType.TEXT),
+                        Property(name="actions", data_type=DataType.TEXT),
+                        Property(name="score", data_type=DataType.NUMBER),
+                    ],
+                    "vectorizer_config": Configure.Vectorizer.none()
+                }
+            }
+            
+            # Create or get collections using CORRECT v4 API
+            for collection_name, config in collection_configs.items():
+                if force_rebuild and self.client.collections.exists(collection_name):
+                    self.client.collections.delete(collection_name)
+                    self.logger.info(f"Deleted existing collection: {collection_name}")
+                
+                if not self.client.collections.exists(collection_name):
+                    # CORRECT v4 collection creation
+                    self.client.collections.create(
+                        name=config["name"],
+                        properties=config["properties"],
+                        vectorizer_config=config["vectorizer_config"]
+                    )
+                    self.logger.info(f"Created collection: {collection_name}")
+                
+                # Get collection reference
+                self.collections[collection_name] = self.client.collections.get(collection_name)
+            
+            # Check if data already exists
+            if not force_rebuild:
+                try:
+                    drug_collection = self.collections["Drug"]
+                    response = drug_collection.aggregate.over_all(total_count=True)
+                    drug_count = response.total_count
+                    if drug_count > 0:
+                        self.logger.info(f"Found existing data: {drug_count} drugs. Use force_rebuild=True to recreate.")
+                        return
+                except:
+                    pass
+            
+            self.logger.info("Building Weaviate store from graph...")
+            self._index_graph_entities(graph)
+            self._index_graph_relationships(graph)
+            
+            # Print final statistics
+            stats = self.get_statistics()
+            self.logger.info(f"Weaviate store built: {stats}")
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing Weaviate: {e}")
+            raise
+    
+    def _index_graph_entities(self, graph: nx.MultiDiGraph):
+        """Index all graph entities with embeddings"""
+        
+        # Group nodes by type for batch processing
+        nodes_by_type = {"Drug": [], "Disease": [], "Protein": []}
+        
+        for node_id, data in graph.nodes(data=True):
+            node_type = data.get('type', 'unknown')
+            
+            # Classify node type
+            if node_type == 'drug':
+                nodes_by_type["Drug"].append((node_id, data))
+            elif node_type == 'disease':
+                nodes_by_type["Disease"].append((node_id, data))
+            elif node_type in ['protein', 'polypeptide']:
+                nodes_by_type["Protein"].append((node_id, data))
+        
+        # Process each type
+        for collection_name, nodes in nodes_by_type.items():
+            if not nodes:
+                continue
+                
+            self.logger.info(f"Indexing {len(nodes)} {collection_name.lower()} entities...")
+            self._batch_index_entities(nodes, collection_name, graph)
+    
+    def _batch_index_entities(self, nodes: List[Tuple], collection_name: str, graph: nx.MultiDiGraph):
+        """Batch index entities of a specific type"""
+        
+        collection = self.collections[collection_name]
+        batch_size = 100
+        
+        for i in range(0, len(nodes), batch_size):
+            batch = nodes[i:i + batch_size]
+            
+            # Prepare batch data using CORRECT v4 API
+            objects = []
+            for node_id, data in batch:
+                # Create searchable text
+                text_parts = self._create_entity_text(data, collection_name)
+                full_text = " | ".join(text_parts)
+                
+                # Generate embedding
+                embedding = self.embedding_model.encode(full_text).tolist()
+                
+                # Prepare data object
+                data_object = self._prepare_entity_data(node_id, data, graph, collection_name)
+                
+                # CORRECT v4 DataObject creation
+                objects.append(DataObject(
+                    properties=data_object,
+                    vector=embedding
+                ))
+            
+            # Insert batch using CORRECT v4 API
+            try:
+                result = collection.data.insert_many(objects)
+                if result.has_errors:
+                    for error in result.errors:
+                        self.logger.error(f"Batch insert error: {error}")
+            except Exception as e:
+                self.logger.error(f"Error inserting batch: {e}")
+    
+    def _create_entity_text(self, data: Dict, collection_name: str) -> List[str]:
+        """Create searchable text representation of entity"""
+        text_parts = []
+        name = data.get('name') or ''
+        
+        text_parts.append(f"{name} ({collection_name.lower()})")
+        
+        if collection_name == "Drug":
+            if data.get('description'):
+                text_parts.append(data['description'][:300])
+            if data.get('indication'):
+                text_parts.append(f"Indication: {data['indication'][:200]}")
+            if data.get('mechanism_of_action'):
+                text_parts.append(f"Mechanism: {data['mechanism_of_action'][:200]}")
+            if data.get('synonyms'):
+                text_parts.append(f"Synonyms: {', '.join(data['synonyms'][:5])}")
+        
+        elif collection_name == "Disease":
+            if data.get('annotation'):
+                text_parts.append(data['annotation'][:300])
+            if data.get('tree_numbers'):
+                text_parts.append(f"MeSH: {', '.join(data['tree_numbers'][:3])}")
+        
+        elif collection_name == "Protein":
+            if data.get('gene_name'):
+                text_parts.append(f"Gene: {data['gene_name']}")
+            if data.get('function'):
+                text_parts.append(f"Function: {data['function'][:200]}")
+        
+        return text_parts
+    
+    def _prepare_entity_data(self, node_id: str, data: Dict, graph: nx.MultiDiGraph, collection_name: str) -> Dict:
+        """Prepare entity data for Weaviate storage"""
+        
+        base_data = {
+            "node_id": node_id,
+            "name": data.get('name') or node_id,
+            "degree": graph.degree(node_id)
         }
+        
+        if collection_name == "Drug":
+            base_data.update({
+                "description": data.get('description', ''),
+                "indication": data.get('indication', ''),
+                "mechanism_of_action": data.get('mechanism_of_action', ''),
+                "synonyms": data.get('synonyms', []),
+                "drugbank_id": data.get('drugbank_id', '')
+            })
+        
+        elif collection_name == "Disease":
+            base_data.update({
+                "annotation": data.get('annotation', ''),
+                "tree_numbers": data.get('tree_numbers', []),
+                "mesh_id": data.get('mesh_id', '')
+            })
+        
+        elif collection_name == "Protein":
+            base_data.update({
+                "gene_name": data.get('gene_name', ''),
+                "function": data.get('function', ''),
+                "uniprot_id": data.get('uniprot_id', '')
+            })
+        
+        return base_data
+    
+    def _index_graph_relationships(self, graph: nx.MultiDiGraph):
+        """Index graph relationships"""
+        
+        self.logger.info("Indexing relationships...")
+        collection = self.collections["Relationship"]
+        
+        relationships = []
+        for source, target, key, data in graph.edges(data=True, keys=True):
+            edge_type = data.get('type', 'unknown')
+            
+            # Create relationship description
+            source_name = graph.nodes[source].get('name') or source
+            target_name = graph.nodes[target].get('name') or target
+            source_type = graph.nodes[source].get('type', 'unknown')
+            target_type = graph.nodes[target].get('type', 'unknown')
+            
+            relationship_text = f"{source_name} ({source_type}) {edge_type} {target_name} ({target_type})"
+            
+            if data.get('actions'):
+                relationship_text += f" | Actions: {data['actions']}"
+            
+            relationships.append({
+                'text': relationship_text,
+                'data': {
+                    "source_id": source,
+                    "target_id": target,
+                    "source_name": source_name,
+                    "target_name": target_name,
+                    "source_type": source_type,
+                    "target_type": target_type,
+                    "edge_type": edge_type,
+                    "actions": data.get('actions', ''),
+                    "score": float(data.get('score', 0.0))
+                }
+            })
+            
+            # Limit relationships to avoid memory issues
+            if len(relationships) >= 50000:
+                break
+        
+        # Batch index relationships
+        batch_size = 100
+        for i in range(0, len(relationships), batch_size):
+            batch = relationships[i:i + batch_size]
+            
+            objects = []
+            for rel in batch:
+                embedding = self.embedding_model.encode(rel['text']).tolist()
+                objects.append(DataObject(
+                    properties=rel['data'],
+                    vector=embedding
+                ))
+            
+            try:
+                result = collection.data.insert_many(objects)
+                if result.has_errors:
+                    for error in result.errors:
+                        self.logger.error(f"Relationship batch error: {error}")
+            except Exception as e:
+                self.logger.error(f"Error inserting relationship batch: {e}")
+    
+    def search_entities(self, 
+                       query: str, 
+                       entity_types: List[str] = None,
+                       n_results: int = 10) -> List[Dict[str, Any]]:
+        """Search for entities using vector similarity"""
+        
+        if not entity_types:
+            entity_types = ["Drug", "Disease", "Protein"]
+        
+        all_results = []
+        
+        for entity_type in entity_types:
+            if entity_type not in self.collections:
+                continue
+                
+            try:
+                collection = self.collections[entity_type]
+                
+                # Generate query embedding
+                query_vector = self.embedding_model.encode(query).tolist()
+                
+                # Perform vector search using CORRECT v4 API
+                response = collection.query.near_vector(
+                    near_vector=query_vector,
+                    limit=n_results // len(entity_types),
+                    return_metadata=MetadataQuery(distance=True),
+                    return_properties=["node_id", "name", "degree"]
+                )
+                
+                for obj in response.objects:
+                    all_results.append({
+                        'id': obj.properties['node_id'],
+                        'name': obj.properties['name'],
+                        'type': entity_type.lower(),
+                        'similarity_score': 1 - obj.metadata.distance,
+                        'degree': obj.properties['degree']
+                    })
+            
+            except Exception as e:
+                self.logger.error(f"Error searching {entity_type}: {e}")
+        
+        # Sort by similarity and return top results
+        all_results.sort(key=lambda x: x['similarity_score'], reverse=True)
+        return all_results[:n_results]
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get Weaviate store statistics"""
+        stats = {}
+        
+        for collection_name in ["Drug", "Disease", "Protein", "Relationship"]:
+            try:
+                if collection_name in self.collections:
+                    collection = self.collections[collection_name]
+                    response = collection.aggregate.over_all(total_count=True)
+                    stats[f"{collection_name.lower()}_count"] = response.total_count
+                else:
+                    stats[f"{collection_name.lower()}_count"] = 0
+            except:
+                stats[f"{collection_name.lower()}_count"] = 0
+        
+        stats["total_entities"] = sum(stats[k] for k in stats if k.endswith('_count') and k != 'relationship_count')
+        stats["persist_directory"] = str(self.persist_directory)
+        
+        return stats
+    
+    def close(self):
+        """Close Weaviate client"""
+        try:
+            self.client.close()
+        except:
+            pass
+
+# Alias for backward compatibility
+GraphVectorStore = WeaviateGraphStore

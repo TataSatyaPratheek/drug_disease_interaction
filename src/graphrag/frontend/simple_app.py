@@ -109,6 +109,38 @@ def main():
                 import random
                 random_disease = random.choice(diseases)
                 show_entity_details(graph, random_disease)
+        
+        # Add this section after the Random Entity Explorer in your simple_app.py
+
+        # Weaviate Vector Search Testing
+        st.subheader("🚀 Weaviate Vector Search")
+        if st.button("Test Weaviate Setup"):
+            try:
+                from src.graphrag.core.vector_store import WeaviateGraphStore
+                vector_store = WeaviateGraphStore()
+                stats = vector_store.get_statistics()
+                
+                if stats['total_entities'] > 0:
+                    st.success(f"✅ Weaviate is working! {stats['total_entities']:,} entities indexed")
+                    
+                    # Test search
+                    test_query = st.text_input("Test vector search:", value="cancer drugs")
+                    if test_query:
+                        results = vector_store.search_entities(test_query, n_results=5)
+                        if results:
+                            st.write("**Vector Search Results:**")
+                            for result in results:
+                                st.write(f"- **{result['name']}** ({result['type']}) - Similarity: {result['similarity_score']:.3f}")
+                        else:
+                            st.info("No results found")
+                else:
+                    st.warning("Weaviate is set up but no data found. Run migration script first.")
+                
+                vector_store.close()
+            except Exception as e:
+                st.error(f"Weaviate setup issue: {e}")
+                st.info("Run: `python scripts/migrate_to_weaviate.py` to set up Weaviate")
+
     
     except Exception as e:
         st.error(f"Error loading graph: {e}")
