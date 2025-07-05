@@ -24,28 +24,33 @@ st.set_page_config(
 
 @st.cache_resource
 def initialize_graphrag_system():
-    """Initialize the complete GraphRAG system"""
-    
-    # Load graph
-    graph_path = project_root / "data/graph/full_mapped/ddi_knowledge_graph.pickle"
-    with open(graph_path, "rb") as f:
-        graph = pickle.load(f)
+    """Initialize the complete GraphRAG system and ensure cleanup."""
     
     # Initialize Weaviate vector store
     vector_store = WeaviateGraphStore()
-    
-    # After initializing vector_store
-    stats = vector_store.get_statistics()
-    if stats['total_entities'] == 0:
-        raise ValueError("Weaviate database is empty! Run migration script.")
-    
-    # Initialize Ollama client
-    llm_client = OllamaClient(model_name="qwen3:1.7b")
-    
-    # Initialize GraphRAG engine
-    engine = GraphRAGQueryEngine(graph, llm_client, vector_store)
-    
-    return graph, vector_store, llm_client, engine
+
+    try:
+        # Load graph
+        graph_path = project_root / "data/graph/full_mapped/ddi_knowledge_graph.pickle"
+        with open(graph_path, "rb") as f:
+            graph = pickle.load(f)
+
+        # After initializing vector_store
+        stats = vector_store.get_statistics()
+        if stats['total_entities'] == 0:
+            raise ValueError("Weaviate database is empty! Run migration script.")
+
+        # Initialize Ollama client
+        llm_client = OllamaClient(model_name="qwen3:1.7b")
+
+        # Initialize GraphRAG engine
+        engine = GraphRAGQueryEngine(graph, llm_client, vector_store)
+
+        yield graph, vector_store, llm_client, engine
+
+    finally:
+        st.info("Shutting down Weaviate connection...")
+        vector_store.close()
 
 def display_reasoning_and_response(result):
     """Display qwen3's reasoning process and final answer"""

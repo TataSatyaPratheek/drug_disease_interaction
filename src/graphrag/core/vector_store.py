@@ -1,6 +1,7 @@
 # src/graphrag/core/vector_store.py
+import logging
 import weaviate
-from weaviate.classes.config import Configure, Property, DataType
+from weaviate.classes import Configure, Property, DataType
 from weaviate.classes.data import DataObject
 from weaviate.classes.query import MetadataQuery, Filter
 import pandas as pd
@@ -19,6 +20,7 @@ class WeaviateGraphStore:
              persist_directory: str = "data/weaviate_db",
              embedding_model: str = "all-MiniLM-L6-v2"):
     
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         
