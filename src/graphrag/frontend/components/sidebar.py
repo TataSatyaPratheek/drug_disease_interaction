@@ -1,9 +1,11 @@
 import streamlit as st
 from graphrag.frontend import config, state
 
-@st.fragment  # ✅ isolate sidebar interactions
-def render_sidebar() -> dict:
-    with st.sidebar:
+  # ✅ isolate sidebar interactions
+with st.sidebar:
+    @st.fragment
+    def render_sidebar() -> dict:
+
         st.markdown("## 🔧 Configuration")
 
         model = st.selectbox(
@@ -28,4 +30,4 @@ def render_sidebar() -> dict:
             st.cache_resource.clear()
             st.experimental_rerun()
 
-    return {"model": model, "max_results": max_results, "temperature": temperature}
+        return {"model": model, "max_results": max_results, "temperature": temperature}
