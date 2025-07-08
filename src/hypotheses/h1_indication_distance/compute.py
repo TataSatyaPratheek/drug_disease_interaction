@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import List, Tuple
 
 import numpy as np
-import pandas as pd
 import networkx as nx
 from rich.table import Table
 from scipy.stats import mannwhitneyu

@@ -11,14 +11,14 @@ from rich.table import Table
 # Based on your tree output, this is the final, fully connected graph
 DEFAULT_GRAPH_PATH = Path("data/graph/full_mapped/ddi_knowledge_graph.pickle")
 DEFAULT_OUTPUT_DIR = Path("reports/hypotheses")
-HYPOTHESES_PACKAGE = "src.hypotheses"
+HYPOTHESES_PACKAGE = "hypotheses"
 
 app = typer.Typer(help="A CLI for running hypothesis tests on the DDI knowledge graph.")
 console = Console()
 
 def get_available_hypotheses():
     """Dynamically finds all available hypothesis modules."""
-    package = importlib.import_module(HYPOTHESES_PACKAGE.replace("src.", ""))
+    package = importlib.import_module(HYPOTHESES_PACKAGE.replace("", ""))
     return [name for _, name, _ in pkgutil.iter_modules(package.__path__) if name.startswith('h')]
 
 @app.command()
@@ -60,7 +60,7 @@ def run(
         instance.run()
         console.rule(f"[bold green]Finished: {name}[/bold green]")
 
-    except Exception as e:
+    except Exception:
         console.print(f"[bold red]An error occurred while running '{name}':[/bold red]")
         console.print_exception()
         raise typer.Exit(code=1)

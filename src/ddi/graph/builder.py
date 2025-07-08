@@ -6,7 +6,7 @@ import pickle
 import json
 import networkx as nx
 import pandas as pd
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from tqdm import tqdm
 import argparse
 

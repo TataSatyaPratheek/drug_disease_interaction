@@ -302,7 +302,7 @@ def main():
     # --- 3. Construct ChEMBL File Paths ---
     logger.info("--- Locating ChEMBL Files ---")
     chembl_rep_file = os.path.join(args.chembl_dir, f"chembl_{args.chembl_version}_chemreps.txt")
-    chembl_map_file = os.path.join(args.chembl_dir, f"chembl_uniprot_mapping.txt")
+    chembl_map_file = os.path.join(args.chembl_dir, "chembl_uniprot_mapping.txt")
 
     if not os.path.exists(chembl_rep_file):
          logger.error(f"Required ChEMBL chem reps file not found: {chembl_rep_file}. Exiting.")

@@ -1,35 +1,72 @@
 # src/graphrag/generators/response_builder.py
-from typing import Dict, List, Any, Optional
-import json
+from typing import Dict, List, Any
 
 class ResponseBuilder:
     """Enhanced response builder with qwen3 reasoning support"""
     
-    def build_response(self, 
-                      query: str,
-                      llm_response: str, 
-                      retrieved_data: Dict[str, Any],
-                      subgraph_context: str,
-                      query_type: str,
-                      confidence_score: float = 0.0,
-                      reasoning: str = None) -> Dict[str, Any]:
-        """Build a structured response with reasoning"""
+    def build_response(self,
+                   query: str,
+                   llm_response: str,
+                   retrieved_data: Dict[str, Any],
+                   subgraph_context: str,
+                   query_type: str = "general",
+                   confidence_score: float = 0.5,
+                   reasoning: str = "",
+                   suggested_followups: List[str] = None) -> Dict[str, Any]:  # Add this parameter
+        """Build comprehensive response with all components"""
+        
+        # Extract citations from retrieved data
+        citations = self._extract_citations(retrieved_data)
+        
+        # Generate follow-up questions if not provided
+        if suggested_followups is None:
+            suggested_followups = self._generate_followup_questions(query, query_type)
         
         response = {
-            "query": query,
-            "query_type": query_type,
             "response": llm_response,
-            "reasoning": reasoning,  # Add qwen3 reasoning output
-            "confidence_score": confidence_score,
+            "reasoning": reasoning,
             "retrieved_data": retrieved_data,
+            "citations": citations,
+            "suggested_followups": suggested_followups,  # Include the parameter
             "subgraph_context": subgraph_context,
-            "citations": self._extract_citations(retrieved_data),
-            "related_entities": self._extract_entities(retrieved_data),
-            "suggested_followups": self._generate_followups(query, query_type)
+            "confidence_score": confidence_score,
+            "query_type": query_type,
+            "metadata": {
+                "entities_found": sum(len(v) if isinstance(v, list) else 0 for v in retrieved_data.values()),
+                "citations_count": len(citations),
+                "context_length": len(subgraph_context)
+            }
         }
         
         return response
-    
+
+    def _generate_followup_questions(self, query: str, query_type: str) -> List[str]:
+        """Generate follow-up questions based on query type"""
+        base_followups = {
+            "comparison": [
+                "What are the mechanisms behind these differences?",
+                "Which patient populations benefit most from each option?",
+                "Are there any contraindications to consider?"
+            ],
+            "mechanism": [
+                "What are the downstream effects of this mechanism?",
+                "Are there alternative pathways involved?",
+                "How does genetic variation affect this pathway?"
+            ],
+            "safety": [
+                "What is the frequency of these adverse effects?",
+                "Are there drug interactions to be aware of?",
+                "What monitoring is recommended?"
+            ],
+            "general": [
+                "What are the clinical implications of these findings?",
+                "Are there any recent research developments?",
+                "What additional factors should be considered?"
+            ]
+        }
+        
+        return base_followups.get(query_type, base_followups["general"])[:3]
+
     def _extract_citations(self, retrieved_data: Dict[str, Any]) -> List[Dict[str, str]]:
         """Extract citations from retrieved data"""
         citations = []
@@ -63,33 +100,3 @@ class ResponseBuilder:
         
         return sorted(entities, key=lambda x: x['relevance_score'], reverse=True)
     
-    def _generate_followups(self, query: str, query_type: str) -> List[str]:
-        """Generate intelligent follow-up questions"""
-        
-        followups = {
-            "drug_repurposing": [
-                "What are the potential side effects of this repurposing approach?",
-                "What clinical trials would be needed to validate this?",
-                "Are there any contraindications to consider?",
-                "What biomarkers could predict success?"
-            ],
-            "mechanism_explanation": [
-                "What are the downstream effects of this mechanism?",
-                "Are there alternative pathways involved?",
-                "How does this compare to other drugs in the same class?",
-                "What resistance mechanisms might develop?"
-            ],
-            "hypothesis_testing": [
-                "What additional experiments could strengthen this evidence?",
-                "What are the statistical limitations of this analysis?",
-                "How could we validate this in clinical studies?",
-                "What confounding factors should we consider?"
-            ]
-        }
-        
-        return followups.get(query_type, [
-            "Can you provide more specific details?",
-            "What are the clinical implications?",
-            "How does this relate to current treatments?",
-            "What are the next research steps?"
-        ])

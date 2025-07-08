@@ -3,11 +3,9 @@ import argparse
 import logging
 import os
 import sys
-import json
-import gzip
 import gc # Import garbage collection module
 from pathlib import Path
-from collections import Counter, defaultdict
+from collections import defaultdict
 import xml.etree.ElementTree as ET # Use standard ET for basic structure checks
 try:
     from lxml import etree # Use lxml for more robust/faster iteration if available
@@ -124,7 +122,7 @@ def analyze_raw_drugbank(xml_path: str):
             context = ET.iterparse(xml_path, events=events)
             logger.info("Using xml.etree.ElementTree.iterparse")
 
-        logger.info(f"Iterating through XML elements...")
+        logger.info("Iterating through XML elements...")
         for event, elem in context:
             # Get root info with standard ET (less efficient)
             if not LXML_AVAILABLE and event == 'start' and 'drugbank' in elem.tag and drug_count == 0:
@@ -327,7 +325,7 @@ def analyze_raw_mesh(mesh_dir: str):
             if context is not None:
                 del context
 
-    logger.info(f"\n--- MeSH 2025 Summary ---")
+    logger.info("\n--- MeSH 2025 Summary ---")
     logger.info(f"Total <{desc_tag_to_find}> elements found: {total_desc_records}")
     logger.info(f"Total <{qual_tag_to_find}> elements found: {total_qual_records}")
     # Suggest garbage collection
@@ -419,7 +417,7 @@ def analyze_raw_opentargets(ot_dir: str):
 
     # Log Summary
     total_size_readable = get_file_size(total_size_bytes) # Use helper for size
-    logger.info(f"\n--- Summary ---")
+    logger.info("\n--- Summary ---")
     logger.info(f"Total Parquet Files Analyzed: {len(parquet_files)}")
     logger.info(f"Total Size: {total_size_readable}")
     logger.info(f"Estimated Total Rows: {total_rows:,}") # Add comma formatting

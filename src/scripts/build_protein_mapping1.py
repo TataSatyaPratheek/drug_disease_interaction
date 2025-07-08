@@ -178,13 +178,13 @@ def build_protein_id_mapping():
                 if all_mappings:
                     mapping_df = pd.concat(all_mappings, ignore_index=True)
                     failed_ids = all_failed
-                    print(f"✓ Full mapping completed!")
+                    print("✓ Full mapping completed!")
                     break
                 else:
                     print("No successful mappings in full run")
                     
             else:
-                print(f"✗ No mappings found with these parameters")
+                print("✗ No mappings found with these parameters")
                 
         except Exception as e:
             print(f"✗ Error with from_db='{attempt['from_db']}', to_db='{attempt['to_db']}': {e}")
@@ -202,7 +202,7 @@ def build_protein_id_mapping():
         print(f"✓ Protein ID mapping saved to {output_csv_path}")
         
         # Show some statistics
-        print(f"✓ Mapping statistics:")
+        print("✓ Mapping statistics:")
         print(f"  - Total Ensembl IDs: {len(ensembl_id_list)}")
         print(f"  - Successfully mapped: {len(mapping_df)}")
         print(f"  - Failed to map: {len(failed_ids)}")

@@ -5,7 +5,7 @@ import pickle
 import networkx as nx
 import torch
 from pathlib import Path
-from src.ddi.graph.builder import KnowledgeGraphBuilder
+from ddi.graph.builder import KnowledgeGraphBuilder
 
 # Skip this test module if PyTorch Geometric is not available
 try:

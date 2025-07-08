@@ -1,13 +1,9 @@
 # src/ddi/analysis/graph_analysis.py
-import os
 import logging
 import networkx as nx
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Any, Optional, Set
-from pathlib import Path
-import matplotlib.pyplot as plt
-import seaborn as sns
+from typing import Dict, List, Any, Optional
 from collections import Counter
 import community as community_louvain  # python-louvain package for community detection
 

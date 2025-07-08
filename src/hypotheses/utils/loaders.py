@@ -3,7 +3,6 @@ import pandas as pd
 from pathlib import Path
 import gzip
 from rich.console import Console
-import os
 
 # --- Configuration (Using absolute paths to avoid any path issues) ---
 PROJECT_ROOT = Path(__file__).resolve().parents[3]  # Go up to project root

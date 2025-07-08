@@ -1,6 +1,5 @@
 # src/hypotheses/h4_side_effect_overlap/compute.py
-import pandas as pd
-from scipy.sparse import lil_matrix, csr_matrix
+from scipy.sparse import lil_matrix
 import numpy as np
 from scipy.stats import spearmanr
 from ..core.base import Hypothesis

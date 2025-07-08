@@ -3,15 +3,10 @@ import os
 import logging
 import networkx as nx
 import numpy as np
-import pandas as pd
-from typing import Dict, List, Tuple, Any, Optional, Set, Union
-from pathlib import Path
+from typing import Dict, List, Tuple, Any, Optional
 import pickle
 import json
-from collections import Counter
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.decomposition import PCA
-from scipy.sparse import csr_matrix
+from sklearn.preprocessing import StandardScaler
 from scipy.sparse.linalg import svds
 
 class FeatureExtractor:

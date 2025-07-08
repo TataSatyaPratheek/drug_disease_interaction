@@ -7,7 +7,7 @@ import requests
 import logging
 import time
 from tqdm import tqdm
-from typing import Any, Dict, List, Set, Optional
+from typing import Any, Dict, List
 import argparse
 
 # --- Configuration ---

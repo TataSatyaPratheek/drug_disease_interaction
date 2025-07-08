@@ -12,8 +12,8 @@ import tempfile
 # Add parent directory to path to allow importing from src
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
-from src.ddi.visualization.graph_viz import GraphVisualizer
-from src.ddi.analysis.graph_analysis import GraphAnalyzer
+from ddi.visualization.graph_viz import GraphVisualizer
+from ddi.analysis.graph_analysis import GraphAnalyzer
 
 class TestGraphVisualizer:
     """Test the GraphVisualizer class"""

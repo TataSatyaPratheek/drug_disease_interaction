@@ -2,9 +2,7 @@
 import os
 import logging
 import xml.etree.ElementTree as ET
-import pandas as pd
-from pathlib import Path
-from typing import Dict, List, Set, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 from tqdm import tqdm
 import pickle
 import json

@@ -5,7 +5,7 @@ import pickle
 import json
 import networkx as nx
 from pathlib import Path
-from src.ddi.graph.builder import KnowledgeGraphBuilder
+from ddi.graph.builder import KnowledgeGraphBuilder
 
 class TestKnowledgeGraphBuilder:
     """Test the KnowledgeGraphBuilder class"""

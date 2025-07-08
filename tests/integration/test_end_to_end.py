@@ -8,12 +8,12 @@ import tempfile
 import shutil
 import subprocess
 import sys
-from src.ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
-from src.ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
-from src.ddi.data.sources.drugbank.integration import DrugBankIntegrator
+from ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
+from ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
+from ddi.data.sources.drugbank.integration import DrugBankIntegrator
 from ddi.parser.mesh_parser import MeSHParser
 from ddi.parser.open_targets_parser import OpenTargetsParser
-from src.ddi.graph.builder import KnowledgeGraphBuilder
+from ddi.graph.builder import KnowledgeGraphBuilder
 
 class TestEndToEnd:
     """End-to-end integration tests for the drug-disease interaction pipeline"""
@@ -277,10 +277,10 @@ import os
 import pickle
 import networkx as nx
 from pathlib import Path
-from src.ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
-from src.ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
-from src.ddi.data.sources.drugbank.integration import DrugBankIntegrator
-from src.ddi.graph.builder import KnowledgeGraphBuilder
+from ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
+from ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
+from ddi.data.sources.drugbank.integration import DrugBankIntegrator
+from ddi.graph.builder import KnowledgeGraphBuilder
 
 class TestDataFlow:
     """Test data flow between components"""

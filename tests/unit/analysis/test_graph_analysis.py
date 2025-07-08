@@ -10,7 +10,7 @@ import sys
 # Add parent directory to path to allow importing from src
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
-from src.ddi.analysis.graph_analysis import GraphAnalyzer
+from ddi.analysis.graph_analysis import GraphAnalyzer
 
 class TestGraphAnalyzer:
     """Test the GraphAnalyzer class"""

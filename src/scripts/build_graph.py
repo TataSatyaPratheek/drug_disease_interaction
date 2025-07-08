@@ -6,17 +6,12 @@ import sys
 import pickle
 import json
 from pathlib import Path
-import networkx as nx
-import torch
-from tqdm import tqdm
-from typing import Any, Optional, Dict, List, Set, Tuple, Union
+from typing import Any
 
 # Add src directory to path to import modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ddi.graph.builder import KnowledgeGraphBuilder
-from ddi.utils.config import config
-from ddi.utils.logging import setup_logging
 
 # --- Add this helper function (if not already present) ---
 def load_data(file_path: str) -> Any:

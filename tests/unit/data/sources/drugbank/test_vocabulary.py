@@ -2,7 +2,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
+from ddi.data.sources.drugbank.vocabulary import DrugBankVocabulary
 
 class TestDrugBankVocabulary:
     """Test the DrugBankVocabulary class"""
@@ -184,7 +184,7 @@ import pytest
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from src.ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
+from ddi.data.sources.drugbank.xml_parser import DrugBankXMLParser
 
 class TestDrugBankXMLParser:
     """Test the DrugBankXMLParser class"""
@@ -268,7 +268,7 @@ import pytest
 import os
 import pickle
 from pathlib import Path
-from src.ddi.data.sources.drugbank.integration import DrugBankIntegrator
+from ddi.data.sources.drugbank.integration import DrugBankIntegrator
 
 class TestDrugBankIntegrator:
     """Test the DrugBankIntegrator class"""

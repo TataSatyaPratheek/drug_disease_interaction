@@ -6,7 +6,6 @@ from ..core.base import Hypothesis
 from ..utils.loaders import load_aact_data
 import random
 import networkx as nx
-import numpy as np
 from tqdm import tqdm
 
 class HypothesisH3(Hypothesis):

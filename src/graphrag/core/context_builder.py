@@ -1,6 +1,6 @@
 # src/graphrag/core/context_builder.py
 import networkx as nx
-from typing import Dict, List, Any, Optional
+from typing import Dict, List
 
 class ContextBuilder:
     """Convert graph data into LLM-friendly context"""

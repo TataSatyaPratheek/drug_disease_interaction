@@ -1,7 +1,6 @@
 # src/scripts/build_protein_mapping.py
 
 import os
-import pickle
 import argparse
 import pandas as pd
 from UniProtMapper import ProtMapper

@@ -1,8 +1,8 @@
-# scripts/migrate_to_weaviate.py
 import pickle
 import sys
 from pathlib import Path
 import logging
+import weaviate
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -11,62 +11,60 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from src.graphrag.core.vector_store import WeaviateGraphStore
-
-def migrate_graph_to_weaviate():
-    """Migrate your existing graph to Weaviate v4"""
+def migrate_with_direct_connection():
+    """Migrate using direct Docker Weaviate connection"""
+    print("🔄 Starting migration to Docker Weaviate...")
     
-    print("🔄 Starting migration to Weaviate v4...")
-    
-    # Load your graph
+    # Load graph
     graph_path = project_root / "data/graph/full_mapped/ddi_knowledge_graph.pickle"
-    
-    if not graph_path.exists():
-        print(f"❌ Graph file not found at {graph_path}")
-        return
-    
     print(f"📊 Loading graph from {graph_path}...")
     with open(graph_path, "rb") as f:
         graph = pickle.load(f)
-    
     print(f"✅ Loaded graph with {graph.number_of_nodes():,} nodes and {graph.number_of_edges():,} edges")
-    
-    # Initialize Weaviate store
+
+    # Direct connection to Docker Weaviate
+    print("🔌 Connecting directly to Docker Weaviate...")
     try:
-        vector_store = WeaviateGraphStore()
-        print("✅ Weaviate v4 client initialized")
+        client = weaviate.connect_to_local(port=8080, grpc_port=50051)
+        client.is_ready()
+        print("✅ Connected to Docker Weaviate on port 8080")
     except Exception as e:
-        print(f"❌ Failed to initialize Weaviate: {e}")
+        print(f"❌ Failed to connect to Docker Weaviate: {e}")
         return
+
+    # Create vector store with direct client
+    print("🔧 Initializing vector store...")
+    from graphrag.core.vector_store import WeaviateGraphStore
     
-    # Migrate graph (this will take a few minutes)
-    print("🚀 Migrating to Weaviate... (this may take 5-10 minutes)")
+    # Temporarily patch the connection manager to use our client
+    vector_store = WeaviateGraphStore.__new__(WeaviateGraphStore)
+    vector_store.client = client
+    vector_store.persist_directory = Path("data/weaviate_db")
+    vector_store.collections = {}
+    
+    # Initialize embedding model
+    from sentence_transformers import SentenceTransformer
+    vector_store.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    vector_store.logger = logging.getLogger("WeaviateGraphStore")
+    
+    print("🚀 Starting data migration...")
     try:
         vector_store.initialize_from_graph(graph, force_rebuild=True)
+        
+        # Show statistics
+        stats = vector_store.get_statistics()
+        print("✅ Migration complete!")
+        print("📊 Final statistics:")
+        for key, value in stats.items():
+            if isinstance(value, int):
+                print(f"   {key}: {value:,}")
+                
     except Exception as e:
         print(f"❌ Migration failed: {e}")
-        vector_store.close()
-        return
-    
-    # Show final statistics
-    stats = vector_store.get_statistics()
-    print("✅ Migration complete!")
-    print("📊 Final statistics:")
-    for key, value in stats.items():
-        print(f"  {key}: {value:,}" if isinstance(value, int) else f"  {key}: {value}")
-    
-    # Test search
-    print("\n🔍 Testing search functionality...")
-    try:
-        test_results = vector_store.search_entities("cancer drug", n_results=3)
-        print(f"Found {len(test_results)} results for 'cancer drug':")
-        for result in test_results:
-            print(f"  - {result['name']} ({result['type']}) - Score: {result['similarity_score']:.3f}")
-    except Exception as e:
-        print(f"❌ Search test failed: {e}")
-    
-    vector_store.close()
-    print("🎉 Migration successful! You can now use Weaviate v4 with your GraphRAG system.")
+        import traceback
+        traceback.print_exc()
+    finally:
+        client.close()
 
 if __name__ == "__main__":
-    migrate_graph_to_weaviate()
+    migrate_with_direct_connection()
