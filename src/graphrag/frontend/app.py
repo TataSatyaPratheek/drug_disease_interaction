@@ -1,100 +1,73 @@
-# src/graphrag/frontend/app.py
-"""Main Streamlit application entry point."""
-from graphrag.frontend import config 
-from graphrag.frontend import state, cache, router
-from graphrag.frontend.components import (
-    sidebar, status, query_panel, response_panel, visualization
-)
+"""Main Streamlit application entry point (fragment-friendly)."""
 import streamlit as st
-import sys
-from pathlib import Path
+from graphrag.frontend import config, state, cache, router
+from graphrag.frontend.components import (
+    sidebar,                    # ← fragment
+    status,
+    query_panel,                # ← fragment
+    response_panel,
+    visualization,
+)
 
-# Ensure the project root is in the path
-project_root = Path(__file__).resolve().parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-def main():
-    """Main application flow."""
-    st.set_page_config(page_title=config.APP_TITLE, layout="wide", page_icon="🧬")
+def main() -> None:
+    st.set_page_config(page_title=config.APP_TITLE, page_icon="🧬", layout="wide")
     state.initialize_session_state()
 
     st.title(config.APP_TITLE)
     st.markdown(config.APP_SUBTITLE)
-    
-    # Render sidebar and get user config
-    user_config = sidebar.render_sidebar()
-    
-    # Check system status
-    system_status = cache.check_system_status()
-    status.render_status_indicators(system_status)
-    if system_status.get('overall') != 'healthy':
-        st.error("System not ready. Please check backend services.")
+
+    # ── 1. Sidebar (fragment) ─────────────────────────────
+    user_cfg = sidebar.render_sidebar()
+
+    # ── 2. Service health banner ──────────────────────────
+    srv_status = cache.check_system_status()
+    status.render_status_indicators(srv_status)
+    if srv_status.get("overall") != "healthy":
+        st.stop()
+
+    # ── 3. Router for extra pages ─────────────────────────
+    if state.get_state("page") != "main":
+        router.render_page(state.get_state("page"))
         return
-        
-    # Load system resources if not already initialized
-    if not state.get_state('system_initialized'):
-        with st.spinner("🚀 Initializing GraphRAG system... This may take a moment."):
+
+    # ── 4. Fast stats (no graph unpickling) ───────────────
+    status.render_system_stats(cache.fast_graph_stats())
+    st.divider()
+
+    # ── 5. Query panel (fragment) ─────────────────────────
+    query, qtype = query_panel.render_query_panel()
+    if query:
+        # Lazy initialisation happens only now
+        if not state.get_state("system_initialized"):
+            with st.spinner("🚀 Initialising back-end…"):
+                g, vec, llm, eng = cache.load_system_resources()
+                state.store_system_components(g, vec, llm, eng)
+
+        with st.spinner("🔍 Processing query…"):
             try:
-                graph, vector_store, llm_client, engine = cache.load_system_resources()
-                state.store_system_components(graph, vector_store, llm_client, engine)
-            except Exception as e:
-                st.error(f"{config.ERROR_MESSAGES['initialization_failed']}\n\nDetails: {e}")
-                st.exception(e)
-                return
-    
-    # Main page vs. sub-pages
-    page = state.get_state('page', 'main')
-    if page != 'main':
-        router.render_page(page)
-    else:
-        # ------- BEFORE processing the query panel -------------
-        graph         = state.get_state("graph")
-        vector_store  = state.get_state("vector_store")
-        metrics       = cache.get_system_metrics(graph, vector_store) if graph else {}
-        status.render_system_stats(metrics)
-        st.markdown("---")
+                res = state.get_state("engine").query(
+                    query, query_type=qtype, max_results=user_cfg["max_results"]
+                )
+                state.set_state("last_response", res)
+            finally:
+                state.set_state("busy", False)
+                st.experimental_rerun()
 
-        query, query_type = query_panel.render_query_panel()
-        if query and not state.get_state("busy"):
-
-            # initialise on demand
-            if not state.get_state("system_initialized"):
-                with st.spinner("🚀 Initialising back-end…"):
-                    graph, vector_store, llm_client, engine = cache.load_system_resources()
-                    state.store_system_components(graph, vector_store, llm_client, engine)
-                            
-        # Render the query panel and process input
-        query, query_type = query_panel.render_query_panel()
-        if query:
-            engine = state.get_state('engine')
-            with st.spinner("🔍 Processing query..."):
-                try:
-                    result = engine.query(
-                        query,
-                        query_type=query_type,
-                        max_results=user_config['max_results']
-                    )
-                    state.set_state('last_response', result)
-                    state.set_state('last_query', query)
-                except Exception as e:
-                    st.error(f"{config.ERROR_MESSAGES['query_failed']}\n\nDetails: {e}")
-                finally:
-                    state.set_state('busy', False)
-                    st.rerun()
-
-        # Render response and visualization
-        if state.get_state('last_response'):
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                response_panel.render_response()
-            with col2:
-                entities = state.get_state('last_response', {}).get('retrieved_data', {})
-                if any(entities.values()):
-                    entity_ids = [e.get('id') for v in entities.values() for e in v if e.get('id')]
-                    if entity_ids:
-                        subgraph = graph.subgraph(entity_ids).copy()
-                        visualization.render_graph_visualization(subgraph)
+    # ── 6. Response & graph ───────────────────────────────
+    if state.get_state("last_response"):
+        col1, col2 = st.columns([2, 1], gap="large")
+        with col1:
+            response_panel.render_response()
+        with col2:
+            g = state.get_state("graph")
+            ent_ids = [
+                e["id"]
+                for lst in state.get_state("last_response")["retrieved_data"].values()
+                for e in lst if e.get("id")
+            ]
+            if g and ent_ids:
+                sub = g.subgraph(ent_ids).copy()
+                visualization.render_graph_visualization(sub)
 
 if __name__ == "__main__":
     main()

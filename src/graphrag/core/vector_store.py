@@ -5,9 +5,6 @@ from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
 try:
-    import weaviate
-    from weaviate.client import WeaviateClient
-    from weaviate.collections.collection import Collection
     from weaviate.classes.config import Configure, Property, DataType
     from weaviate.classes.data import DataObject
     from weaviate.classes.query import MetadataQuery, Filter

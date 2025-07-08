@@ -1,7 +1,8 @@
 # src/graphrag/frontend/components/status.py
 """Renders system status and metric components."""
-import streamlit as st
 from .. import config
+from ..cache import fast_graph_stats
+import streamlit as st
 
 def render_status_indicators(system_status):
     """Render system status indicators for Ollama and Weaviate."""
@@ -20,17 +21,8 @@ def render_status_indicators(system_status):
         else:
             st.error(config.ERROR_MESSAGES["weaviate_not_available"])
 
-def render_system_stats(stats):
-    """Render the main system statistics panel."""
-    if not stats:
-        st.info("Statistics are not available yet.")
-        return
-        
-    summary = stats.get('summary', {})
-    st.markdown("## 📊 System Stats")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Entities", f"{summary.get('total_entities', 0):,}")
-    col2.metric("Relationships", f"{summary.get('relationships', 0):,}")
-    col3.metric("Drugs", f"{summary.get('drugs', 0):,}")
-    col4.metric("Diseases", f"{summary.get('diseases', 0):,}")
+def render_system_stats(_unused_vector=None):
+    stats = fast_graph_stats()
+    col1, col2 = st.columns(2)
+    col1.metric("Graph Nodes", f"{stats['nodes']:,}")
+    col2.metric("Graph Edges", f"{stats['edges']:,}")
