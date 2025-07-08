@@ -1,5 +1,10 @@
 # src/graphrag/frontend/app.py
 """Main Streamlit application entry point."""
+from graphrag.frontend import config 
+from graphrag.frontend import state, cache, router
+from graphrag.frontend.components import (
+    sidebar, status, query_panel, response_panel, visualization
+)
 import streamlit as st
 import sys
 from pathlib import Path
@@ -8,11 +13,6 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-from graphrag.frontend import config, state, cache, router
-from graphrag.frontend.components import (
-    sidebar, status, query_panel, response_panel, visualization
-)
 
 def main():
     """Main application flow."""
@@ -48,13 +48,22 @@ def main():
     if page != 'main':
         router.render_page(page)
     else:
-        # Display system metrics
-        graph = state.get_state('graph')
-        vector_store = state.get_state('vector_store')
-        metrics = cache.get_system_metrics(graph, vector_store)
+        # ------- BEFORE processing the query panel -------------
+        graph         = state.get_state("graph")
+        vector_store  = state.get_state("vector_store")
+        metrics       = cache.get_system_metrics(graph, vector_store) if graph else {}
         status.render_system_stats(metrics)
         st.markdown("---")
-        
+
+        query, query_type = query_panel.render_query_panel()
+        if query and not state.get_state("busy"):
+
+            # initialise on demand
+            if not state.get_state("system_initialized"):
+                with st.spinner("🚀 Initialising back-end…"):
+                    graph, vector_store, llm_client, engine = cache.load_system_resources()
+                    state.store_system_components(graph, vector_store, llm_client, engine)
+                            
         # Render the query panel and process input
         query, query_type = query_panel.render_query_panel()
         if query:

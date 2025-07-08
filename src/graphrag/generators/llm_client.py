@@ -44,7 +44,7 @@ class OllamaClient:
                 host=f"{scheme}://{host}:{port}",
                 timeout=timeout,
                 tls=False,
-                verify=True,      # may fail on mis-installed root CAs
+                verify=False,      # may fail on mis-installed root CAs
             )
         except ssl.SSLError as e:  # pragma: no cover
             LOGGER.warning(
