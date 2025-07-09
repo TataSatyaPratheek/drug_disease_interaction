@@ -1,35 +1,39 @@
+
 from typing import Dict, List, Any, Optional
 import logging
 from .llama_integration import LlamaGraphRAGEngine
 from .retriever import GraphRetriever
 from .context_builder import ContextBuilder
-from .prompt_templates import ScientificPromptTemplates
+from .prompt_templates import PromptTemplates
 from .vector_store import WeaviateGraphStore
 from ..generators.llm_client import OllamaClient
 from ..generators.response_builder import ResponseBuilder
 from ..retrievers import SubgraphRetriever, PathRetriever, CommunityRetriever
 from .query_processor import preprocess_query, classify_query_type, QueryStrategy
 from .result_aggregator import aggregate_search_results, format_results_for_llm, generate_followup_questions
+from .graph_analytics import HighPerformanceGraphAnalytics
+from .connection_resilience import ConnectionResilience
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
 
 class GraphRAGQueryEngine:
-    """Enhanced GraphRAG orchestrator with qwen3 reasoning capabilities"""
+    """Enhanced GraphRAG orchestrator with high-performance analytics."""
     
     def __init__(self, graph, llm_client: OllamaClient, vector_store: WeaviateGraphStore):
         self.graph = graph
         self.retriever = GraphRetriever(graph)
         self.context_builder = ContextBuilder(graph)
-        self.prompt_templates = ScientificPromptTemplates()
+        self.prompt_templates = PromptTemplates()
         self.llm_client = llm_client
         self.vector_store = vector_store
         self.response_builder = ResponseBuilder()
         self.subgraph_retriever = SubgraphRetriever(graph)
         self.path_retriever = PathRetriever(graph)
         self.community_retriever = CommunityRetriever(graph)
-
-        logger.info("GraphRAGQueryEngine initialized successfully")
+        self.analytics = HighPerformanceGraphAnalytics(graph)
+        self.resilience = ConnectionResilience()
         # Initialize LlamaIndex integration
         self.llama_engine = LlamaGraphRAGEngine(
             nx_graph=graph,
@@ -40,58 +44,207 @@ class GraphRAGQueryEngine:
             subgraph_retriever=self.subgraph_retriever
         )
     
+    @ConnectionResilience.with_retry(max_attempts=3, wait_seconds=2)
     def query(self, user_query: str, query_type: str = "auto", max_results: int = 15) -> Dict[str, Any]:
-        """Enhanced query processing with better error handling."""
+        """Enhanced query processing with graph analytics."""
         logger.info(f"Processing query: '{user_query}'")
-        
         try:
-            # 1. Entity retrieval (already working)
-            entities = self._vector_entity_search(user_query, max_results)
+            # 1. Entity retrieval (enhanced with analytics)
+            entities = self._enhanced_vector_entity_search(user_query, max_results)
             total_entities = sum(len(v) for v in entities.values())
             logger.info(f"Retrieved {total_entities} entities total")
-            
-            # 2. Build context
-            graph_context = self._build_graph_context(entities, user_query)
-            
-            # 3. Create prompt
-            detailed_prompt = self._create_comprehensive_prompt(user_query, graph_context, entities)
-            
-            # 4. Generate response with detailed logging
+            # 2. Build graph-aware context
+            graph_context = self._build_enhanced_graph_context(entities, user_query)
+            # 3. Create prompt with graph intelligence
+            detailed_prompt = self._create_graph_aware_prompt(user_query, graph_context, entities)
+            # 4. Generate response with robust LLM call
             logger.info("Calling LLM for response generation...")
-            logger.info(f"Prompt length: {len(detailed_prompt)}")
-            
             try:
-                reasoning, final_answer = self.llm_client.generate_with_reasoning(detailed_prompt)
-                logger.info(f"LLM returned - Reasoning: {len(reasoning)} chars, Answer: {len(final_answer)} chars")
+                reasoning, final_answer = self.resilience.robust_ollama_call(
+                    self.llm_client, detailed_prompt
+                )
+                logger.info(f"LLM response generated - Reasoning: {len(reasoning)} chars, Answer: {len(final_answer)} chars")
             except Exception as llm_error:
                 logger.error(f"LLM generation failed: {llm_error}")
                 reasoning = f"LLM generation failed: {str(llm_error)}"
                 final_answer = f"Unable to generate response due to LLM error: {str(llm_error)}"
-
-            # 5. Extract paths and communities for visualization
-            path_data = self._extract_path_data(entities, user_query)
-            community_data = self._extract_community_data(entities)
-
-            # 6. Build response
+            # 5. Extract advanced graph features
+            path_data = self._extract_enhanced_path_data(entities, user_query)
+            community_data = self._extract_enhanced_community_data(entities)
+            node_importance = self._get_node_importance_rankings(entities)
+            # 6. Build comprehensive response
             response = {
                 'response': final_answer,
                 'reasoning': reasoning,
                 'retrieved_data': entities,
                 'citations': self._build_citations(entities),
-                'suggested_followups': self._generate_query_specific_followups(user_query, entities),
+                'suggested_followups': self._generate_graph_aware_followups(user_query, entities),
                 'query_type': query_type,
-                'confidence_score': 0.8 if total_entities > 0 else 0.3,
+                'confidence_score': self._calculate_response_confidence(entities, total_entities),
                 'subgraph_context': graph_context,
                 'path_data': path_data,
                 'community_data': community_data,
+                'node_importance': node_importance,
+                'graph_metrics': self._get_query_specific_metrics(entities)
             }
-            
-            logger.info("Query processing completed")
+            logger.info("Enhanced query processing completed")
             return response
-            
         except Exception as e:
             logger.error(f"Query processing failed: {e}")
             raise
+
+    def _enhanced_vector_entity_search(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
+        """Enhanced vector search with graph analytics ranking."""
+        try:
+            # Get basic vector search results
+            base_results = self._vector_entity_search(query, max_results)
+            # Enhance with graph analytics
+            for entity_type, entities in base_results.items():
+                for entity in entities:
+                    entity_id = entity.get('id')
+                    if entity_id:
+                        # Add importance ranking
+                        importance_rankings = self.analytics.rank_nodes_by_importance(
+                            entity_type, top_k=100
+                        )
+                        # Find this entity in rankings
+                        for rank, ranked_entity in enumerate(importance_rankings):
+                            if ranked_entity['id'] == entity_id:
+                                entity['importance_rank'] = rank + 1
+                                entity['importance_score'] = ranked_entity['importance_score']
+                                entity['centrality_metrics'] = {
+                                    'pagerank': ranked_entity['pagerank'],
+                                    'betweenness': ranked_entity['betweenness'],
+                                    'closeness': ranked_entity['closeness'],
+                                    'degree': ranked_entity['degree']
+                                }
+                                break
+            return base_results
+        except Exception as e:
+            logger.error(f"Enhanced vector search failed: {e}")
+            return self._vector_entity_search(query, max_results)
+
+    def _build_enhanced_graph_context(self, entities: Dict, query: str) -> str:
+        """Build enhanced context with graph analytics insights."""
+        try:
+            context_parts = [f"ENHANCED GRAPH ANALYSIS FOR QUERY: '{query}'\n"]
+            total_entities = sum(len(v) for v in entities.values())
+            context_parts.append(f"Retrieved {total_entities} entities from knowledge graph with graph analytics:\n")
+            # Add entity information with importance rankings
+            for entity_type, entity_list in entities.items():
+                if entity_list:
+                    context_parts.append(f"\n{entity_type.upper()} ({len(entity_list)}):")
+                    for entity in entity_list[:3]:  # Top 3 per type
+                        name = entity.get('name', 'Unknown')
+                        importance_rank = entity.get('importance_rank', 'N/A')
+                        importance_score = entity.get('importance_score', 0)
+                        context_parts.append(
+                            f"- {name} (Importance Rank: {importance_rank}, "
+                            f"Score: {importance_score:.4f})"
+                        )
+            # Add community insights
+            if total_entities > 0:
+                community_stats = self.community_retriever.get_community_statistics()
+                if community_stats:
+                    context_parts.append(f"\nCOMMUNITY INSIGHTS:")
+                    context_parts.append(f"- {community_stats['total_communities']} communities detected")
+                    context_parts.append(f"- Modularity: {community_stats['modularity']:.3f}")
+                    context_parts.append(f"- Average community size: {community_stats['average_community_size']:.1f}")
+            return "\n".join(context_parts)
+        except Exception as e:
+            logger.error(f"Enhanced context building failed: {e}")
+            return self._build_graph_context(entities, query)
+
+    def _create_graph_aware_prompt(self, query: str, context: str, entities: Dict) -> str:
+        """Create prompt with graph-aware intelligence."""
+        try:
+            entity_summary = []
+            for entity_type, entity_list in entities.items():
+                if entity_list:
+                    entity_summary.append(f"{len(entity_list)} {entity_type}")
+            if not entity_summary:
+                entity_summary = ["no specific entities"]
+            prompt = f"""You are a senior biomedical researcher with access to a comprehensive drug-disease knowledge graph enhanced with graph analytics.
+
+RESEARCH QUERY: {query}
+
+GRAPH ANALYTICS RESULTS:
+Found {', '.join(entity_summary)} using advanced graph traversal and importance ranking.
+
+ENHANCED CONTEXT WITH GRAPH INTELLIGENCE:
+{context}
+
+ANALYSIS FRAMEWORK:
+1. **Network Analysis**: Use the importance rankings and centrality metrics provided
+2. **Community Structure**: Consider the community insights for therapeutic groupings
+3. **Pathway Analysis**: Leverage the graph topology for mechanism discovery
+4. **Evidence Integration**: Synthesize findings from multiple graph perspectives
+
+RESPONSE FORMAT:
+- **Executive Summary**: 2-3 sentences with key findings and graph-based insights
+- **Detailed Analysis**: Comprehensive reasoning including:
+  • Graph topology insights and node importance
+  • Community structure and therapeutic implications
+  • Pathway analysis and mechanism discovery
+  • Integration of graph-based evidence
+
+GRAPH-NATIVE REASONING:
+Use the graph structure, node importance, and community insights to provide deeper analysis than simple entity matching. Consider network effects and topological relationships.
+
+Please provide a comprehensive analysis leveraging the graph intelligence."""
+            return prompt
+        except Exception as e:
+            logger.error(f"Graph-aware prompt creation failed: {e}")
+            return self._create_comprehensive_prompt(query, context, entities)
+
+    def _calculate_response_confidence(self, entities: Dict, total_entities: int) -> float:
+        """Calculate confidence score based on graph analytics."""
+        try:
+            if total_entities == 0:
+                return 0.1
+            # Base confidence on entity count
+            entity_confidence = min(total_entities / 10, 1.0)
+            # Enhance with importance scores
+            total_importance = 0
+            importance_count = 0
+            for entity_list in entities.values():
+                for entity in entity_list:
+                    importance_score = entity.get('importance_score', 0)
+                    if importance_score > 0:
+                        total_importance += importance_score
+                        importance_count += 1
+            importance_confidence = (total_importance / importance_count) if importance_count > 0 else 0.5
+            # Combine scores
+            final_confidence = (entity_confidence * 0.6) + (importance_confidence * 0.4)
+            return min(final_confidence, 1.0)
+        except Exception as e:
+            logger.error(f"Confidence calculation failed: {e}")
+            return 0.5
+
+    def _get_query_specific_metrics(self, entities: Dict) -> Dict[str, Any]:
+        """Get query-specific graph metrics."""
+        try:
+            all_entity_ids = [
+                entity['id'] for entity_list in entities.values() 
+                for entity in entity_list if entity.get('id')
+            ]
+            if not all_entity_ids:
+                return {}
+            # Get subgraph metrics
+            subgraph = self.analytics.get_neighborhood_subgraph(all_entity_ids, radius=2)
+            import networkx as nx
+            metrics = {
+                'subgraph_size': subgraph.number_of_nodes(),
+                'subgraph_edges': subgraph.number_of_edges(),
+                'density': nx.density(subgraph) if subgraph.number_of_nodes() > 0 else 0,
+                'connected_components': nx.number_connected_components(subgraph.to_undirected()),
+                'entity_types_found': list(entities.keys()),
+                'total_entities': sum(len(v) for v in entities.values())
+            }
+            return metrics
+        except Exception as e:
+            logger.error(f"Query metrics calculation failed: {e}")
+            return {}
 
     def _extract_path_data(self, entities: Dict, query: str) -> 'Optional[Dict]':
         """Extract path data for visualization."""
