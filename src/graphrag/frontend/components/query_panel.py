@@ -1,9 +1,10 @@
 import streamlit as st
 from graphrag.frontend import config, state
+import logging
+logger = logging.getLogger(__name__)
 
-@st.fragment   # ✅ only this block reruns on every keystroke
-def render_query_panel() -> tuple[str | None, str | None]:
-    """Return (query_text, query_type) *only* when user presses Submit."""
+def render_query_panel() -> tuple[str | None, str | None, bool]:
+    """Render main query input section and return the user's query."""
     with st.form(key="query_form", clear_on_submit=False):
         st.markdown("## 💬 Ask Your Question")
 
@@ -29,6 +30,7 @@ def render_query_panel() -> tuple[str | None, str | None]:
     if submitted and query_text.strip():
         # prevent double-clicks while the back-end is busy
         state.set_state("busy", True)
-        return query_text.strip(), query_type
+        logger.info(f"Query submitted: {query_text.strip()}")
+        return query_text.strip(), query_type, True
 
-    return None, None
+    return None, None, False

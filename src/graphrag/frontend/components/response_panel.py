@@ -7,7 +7,12 @@ def render_response():
     """Render the complete response section from session state."""
     response_data = state.get_state('last_response')
     if not response_data:
+        # Show helpful message if no response yet
+        st.info("💡 Submit a query above to see results here.")
         return
+
+    # Debug info (remove in production)
+    st.write("Debug: Response data keys:", list(response_data.keys()) if isinstance(response_data, dict) else "Not a dict")
 
     # Main Response
     st.markdown("## 🎯 Final Answer")

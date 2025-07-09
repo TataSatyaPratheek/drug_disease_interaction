@@ -42,6 +42,9 @@ VISUALIZATION_HEIGHT = 600
 
 # Error Messages
 ERROR_MESSAGES = {
+    "query_processing_failed": "❌ Query processing failed. Please check your input and try again.",
+    "engine_not_ready": "❌ Query engine not ready. Please wait for system initialization.",
+    "backend_error": "❌ Backend processing error. Please try again.",
     "ollama_not_available": "❌ Ollama server not available. Please ensure the service is running.",
     "weaviate_not_available": "❌ Weaviate database not available. Please ensure the service is running.",
     "initialization_failed": "❌ System initialization failed. Check logs for details.",
@@ -53,4 +56,6 @@ SUCCESS_MESSAGES = {
     "system_ready": "✅ System ready! Graph: {nodes:,} nodes, Vector DB: {entities:,} entities.",
     "cleanup_complete": "🧹 Resources cleaned up successfully.",
     "query_complete": "✅ Query processed successfully.",
+    "query_submitted": "📤 Query submitted for processing...",
+    "backend_ready": "🚀 Backend services are ready.",
 }

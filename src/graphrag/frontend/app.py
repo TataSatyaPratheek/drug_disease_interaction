@@ -1,5 +1,6 @@
 """Main Streamlit application entry point (fragment-friendly)."""
 import streamlit as st
+import logging
 from graphrag.frontend import config, state, cache, router
 from graphrag.frontend.components import (
     sidebar,                    # ← fragment
@@ -8,6 +9,8 @@ from graphrag.frontend.components import (
     response_panel,
     visualization,
 )
+
+logger = logging.getLogger(__name__)
 
 def main() -> None:
     st.set_page_config(page_title=config.APP_TITLE, page_icon="🧬", layout="wide")
@@ -18,7 +21,7 @@ def main() -> None:
 
     # ── 1. Sidebar ────────────────────────────────────────
     with st.sidebar:
-        user_cfg = sidebar.render_sidebar()
+        user_config = sidebar.render_sidebar()
 
     # ── 2. Service health banner ──────────────────────────
     srv_status = cache.check_system_status()
@@ -36,23 +39,47 @@ def main() -> None:
     st.divider()
 
     # ── 5. Query panel (fragment) ─────────────────────────
-    query, qtype = query_panel.render_query_panel()
-    if query:
-        # Lazy initialisation happens only now
+    query, query_type, submitted = query_panel.render_query_panel()
+    
+    if submitted and query and not state.get_state("busy"):
+        # Set busy state immediately
+        state.set_state("busy", True)
+        
+        # initialise on demand
         if not state.get_state("system_initialized"):
             with st.spinner("🚀 Initialising back-end…"):
-                g, vec, llm, eng = cache.load_system_resources()
-                state.store_system_components(g, vec, llm, eng)
+                try:
+                    graph, vector_store, llm_client, engine = cache.load_system_resources()
+                    state.store_system_components(graph, vector_store, llm_client, engine)
+                    st.success("✅ System initialized successfully!")
+                except Exception as e:
+                    st.error(f"Failed to initialize system: {e}")
+                    state.set_state("busy", False)
+                    st.stop()
 
-        with st.spinner("🔍 Processing query…"):
-            try:
-                res = state.get_state("engine").query(
-                    query, query_type=qtype, max_results=user_cfg["max_results"]
-                )
-                state.set_state("last_response", res)
-            finally:
-                state.set_state("busy", False)
-                st.experimental_rerun()
+        # Process the query
+        engine = state.get_state('engine')
+        if engine:
+            with st.spinner("🔍 Processing query..."):
+                try:
+                    user_config = state.get_state("user_config", {"max_results": 10})
+                    result = engine.query(
+                        query,
+                        query_type=query_type,
+                        max_results=user_config.get('max_results', 10)
+                    )
+                    state.set_state('last_response', result)
+                    state.set_state('last_query', query)
+                    st.success("✅ Query processed successfully!")
+                except Exception as e:
+                    st.error(f"Query processing failed: {e}")
+                    logger.error(f"Query processing error: {e}")
+                finally:
+                    state.set_state('busy', False)
+                    st.rerun()
+        else:
+            st.error("Engine not initialized")
+            state.set_state("busy", False)
 
     # ── 6. Response & graph ───────────────────────────────
     if state.get_state("last_response"):
