@@ -5,8 +5,7 @@ import networkx as nx
 import plotly.graph_objects as go
 from typing import Dict, Tuple
 import logging
-from .. import config
-
+from .graph_interactive import render_graph_tabs
 logger = logging.getLogger(__name__)
 
 @st.cache_data(hash_funcs={nx.Graph: lambda g: nx.weisfeiler_lehman_graph_hash(g)})
@@ -20,16 +19,32 @@ def compute_graph_layout(subgraph: nx.Graph) -> Dict[str, Tuple[float, float]]:
         logger.error(f"Layout computation failed: {e}")
         return {}
 
-def render_graph_visualization(subgraph: nx.Graph, title: str = "Knowledge Graph"):
+def render_graph_visualization(subgraph: nx.Graph, title: str = "Knowledge Graph", use_interactive: bool = True):
+    """Render graph visualization with interactive option."""
+    
+    if use_interactive:
+        # Use new interactive component
+        clicked_node = render_graph_tabs(subgraph)
+        
+        if clicked_node:
+            # Store clicked node for expansion
+            st.session_state.selected_node = clicked_node
+            
+        return clicked_node
+    else:
+        # Use legacy Plotly rendering
+        return render_plotly_graph(subgraph, title)
+
+def render_plotly_graph(subgraph: nx.Graph, title: str = "Knowledge Graph"):
     """Render interactive graph visualization, capped for performance."""
     if not subgraph or len(subgraph.nodes) == 0:
         st.info("No entities found to visualize.")
         return
 
     # Performance cap
-    if len(subgraph.nodes) > config.MAX_NODES_VISUALIZATION:
-        st.warning(f"Displaying top {config.MAX_NODES_VISUALIZATION} nodes for performance.")
-        top_nodes = sorted(subgraph.degree, key=lambda item: item[1], reverse=True)[:config.MAX_NODES_VISUALIZATION]
+    if len(subgraph.nodes) > 100:
+        st.warning(f"Displaying top 100 nodes for performance.")
+        top_nodes = sorted(subgraph.degree, key=lambda item: item[1], reverse=True)[:100]
         subgraph = subgraph.subgraph([n for n, d in top_nodes]).copy()
     
     pos = compute_graph_layout(subgraph)
