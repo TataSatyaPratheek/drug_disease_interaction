@@ -1,4 +1,4 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import logging
 from .llama_integration import LlamaGraphRAGEngine
 from .retriever import GraphRetriever
@@ -67,8 +67,12 @@ class GraphRAGQueryEngine:
                 logger.error(f"LLM generation failed: {llm_error}")
                 reasoning = f"LLM generation failed: {str(llm_error)}"
                 final_answer = f"Unable to generate response due to LLM error: {str(llm_error)}"
-            
-            # 5. Build response
+
+            # 5. Extract paths and communities for visualization
+            path_data = self._extract_path_data(entities, user_query)
+            community_data = self._extract_community_data(entities)
+
+            # 6. Build response
             response = {
                 'response': final_answer,
                 'reasoning': reasoning,
@@ -78,6 +82,8 @@ class GraphRAGQueryEngine:
                 'query_type': query_type,
                 'confidence_score': 0.8 if total_entities > 0 else 0.3,
                 'subgraph_context': graph_context,
+                'path_data': path_data,
+                'community_data': community_data,
             }
             
             logger.info("Query processing completed")
@@ -86,6 +92,40 @@ class GraphRAGQueryEngine:
         except Exception as e:
             logger.error(f"Query processing failed: {e}")
             raise
+
+    def _extract_path_data(self, entities: Dict, query: str) -> 'Optional[Dict]':
+        """Extract path data for visualization."""
+        try:
+            # Get entity IDs for path finding
+            all_ids = [e['id'] for entity_list in entities.values() for e in entity_list if e.get('id')]
+            
+            if len(all_ids) >= 2:
+                # Use existing path retriever
+                paths = self.path_retriever.find_drug_disease_paths(all_ids[0], all_ids[1], max_paths=3)
+                if paths:
+                    return {
+                        'path': paths[0].get('path', []),
+                        'path_names': paths[0].get('path_names', []),
+                        'path_types': paths[0].get('path_types', [])
+                    }
+        except Exception as e:
+            logger.warning(f"Path extraction failed: {e}")
+        
+        return None
+
+    def _extract_community_data(self, entities: Dict) -> 'Optional[List[Dict]]':
+        """Extract community data for visualization."""
+        try:
+            # Get entity IDs for community analysis
+            all_ids = [e['id'] for entity_list in entities.values() for e in entity_list if e.get('id')]
+            
+            if all_ids:
+                communities = self.community_retriever.get_communities(all_ids[:5])
+                return communities
+        except Exception as e:
+            logger.warning(f"Community extraction failed: {e}")
+        
+        return None
 
     def _build_graph_context(self, entities: Dict, query: str) -> str:
         """Build specific context from retrieved entities and graph relationships."""

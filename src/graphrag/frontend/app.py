@@ -79,14 +79,24 @@ def main():
         with col1:
             response_panel.render_response()
         with col2:
-            entities = state.get_state('last_response', {}).get('retrieved_data', {})
+            response_data = state.get_state('last_response')
+            entities = response_data.get('retrieved_data', {})
+            path_data = response_data.get('path_data')
+            community_data = response_data.get('community_data')
+            
             if any(entities.values()):
                 entity_ids = [e.get('id') for v in entities.values() for e in v if e.get('id')]
                 if entity_ids:
                     graph = state.get_state('graph')
                     if graph:
-                        subgraph = graph.subgraph(entity_ids).copy()
-                        visualization.render_graph_visualization(subgraph)
+                        subgraph = graph.subgraph([node for node in entity_ids if node in graph]).copy()
+                        from graphrag.frontend.components.graph_interactive import render_graph_tabs
+                        clicked_node = render_graph_tabs(
+                            subgraph,
+                            path_data=path_data,
+                            communities=community_data,
+                            selected_node=state.get_state('selected_node')
+                        )
 
 if __name__ == "__main__":
     main()

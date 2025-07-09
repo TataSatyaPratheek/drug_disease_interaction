@@ -18,35 +18,35 @@ def render_response():
     final_answer = response_data.get('response', '').strip()
     reasoning = response_data.get('reasoning', '').strip()
     
-    # Main Response (simplified)
+    # Main Response with improved formatting
     if final_answer and final_answer != "Failed to generate response. Please check Ollama setup.":
-        st.markdown("## 🎯 Final Answer")
-        st.markdown(final_answer)
+        st.markdown("## 🎯 **Research Summary**")
+        st.markdown(f"**{final_answer}**")
+        st.markdown("---")
     else:
         st.warning("⚠️ No response generated.")
         return
 
-    # AI Reasoning Process (simplified)
-    if reasoning and not reasoning.startswith("Error in reasoning"):
-        st.markdown("## 🧠 AI Reasoning Process")
-        st.markdown(reasoning)
-    else:
-        st.warning("⚠️ No reasoning generated.")
+    # Detailed Analysis (Collapsible)
+    with st.expander("🧠 **Detailed Analysis & Reasoning**", expanded=True):
+        if reasoning and not reasoning.startswith("Error in reasoning"):
+            st.markdown(reasoning)
+        else:
+            st.warning("⚠️ No detailed analysis available.")
 
-    # Citations Container
-    citations = response_data.get('citations', [])
+    # Citations
+    citations = response_data.get('citations')
     if citations:
         with st.expander("📚 **Evidence Sources**", expanded=False):
-            for citation in citations[:10]:
-                st.markdown(f"**{citation.get('name', 'Unknown')}** ({citation.get('type', 'unknown')})")
+            for i, citation in enumerate(citations[:10], 1):
+                st.markdown(f"**{i}. {citation.get('name', 'Unknown')}** ({citation.get('type', 'unknown')})")
 
-    # Follow-up Questions Container (Fixed)
-    followups = response_data.get('suggested_followups', [])
+    # Follow-up Questions
+    followups = response_data.get('suggested_followups')
     if followups:
-        st.markdown("### 💡 Related Questions")
+        st.markdown("## 💡 Suggested Follow-up Questions")
         for i, question in enumerate(followups):
             if st.button(question, key=f"followup_{i}_{hash(question)}", use_container_width=True):
-                # Store in conversation and trigger new query
                 _handle_followup_question(question)
 
     # Debug Information (Collapsible)

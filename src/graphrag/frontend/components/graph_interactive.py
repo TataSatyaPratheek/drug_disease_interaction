@@ -16,8 +16,6 @@ class InteractiveGraphRenderer:
             'drug': '#FF6B6B',
             'disease': '#4ECDC4', 
             'protein': '#45B7D1',
-            'polypeptide': '#F7DC6F',
-            'category': '#BB8FCE',
             'unknown': '#95A5A6'
         }
         
@@ -243,17 +241,22 @@ def render_graph_tabs(
             title="Entity Neighborhood",
             selected_node=selected_node
         )
-    
+        # Add click-to-expand functionality
+        if clicked_node:
+            st.session_state.selected_node = clicked_node
+            st.session_state.expand_node = True
+            st.rerun()
+
     with tab2:
         if path_data:
             renderer.render_path_visualization(path_data, "Key Pathways")
         else:
-            st.info("No path data available. Run a query to discover pathways.")
-    
+            st.info("💡 **Path Analysis**: Run queries with multiple entities to discover molecular pathways and drug-disease connections.")
+
     with tab3:
         if communities:
             renderer.render_community_overview(communities, "Community Structure")
         else:
-            st.info("No community data available. Communities will be computed dynamically.")
-    
+            st.info("💡 **Community Analysis**: Functional groups and therapeutic categories will be displayed here based on your query results.")
+
     return clicked_node
