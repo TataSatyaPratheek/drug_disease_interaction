@@ -1,103 +1,73 @@
-# src/graphrag/core/prompt_templates.py
-
-class PromptTemplates:
-    """Enhanced prompt templates optimized for qwen3 reasoning capabilities"""
+class ScientificPromptTemplates:
+    """Enhanced prompts for professional scientific responses."""
     
-    def __init__(self):
-        self.system_prompt = """You are an expert biomedical AI assistant specializing in drug-disease interactions, with access to a comprehensive molecular knowledge graph containing drugs, diseases, proteins, and their relationships.
+    @staticmethod
+    def biomedical_analysis_prompt(query: str, context: str, entities: dict) -> str:
+        """Generate scientific analysis prompt."""
+        
+        entity_counts = {k: len(v) for k, v in entities.items() if v}
+        
+        prompt = f"""You are a senior biomedical researcher with expertise in drug discovery and clinical pharmacology. 
 
-Your responses should demonstrate clear scientific reasoning and be based on the provided graph context. Always think step-by-step and show your reasoning process."""
+RESEARCH QUERY: {query}
+
+AVAILABLE EVIDENCE:
+{context}
+
+ANALYSIS FRAMEWORK:
+1. **Mechanistic Analysis**: Examine molecular mechanisms and pathways
+2. **Clinical Evidence**: Evaluate efficacy, safety, and therapeutic outcomes  
+3. **Comparative Assessment**: Compare interventions based on evidence strength
+4. **Limitations**: Acknowledge gaps in available data
+
+RESPONSE FORMAT:
+- **Executive Summary**: 2-3 sentences with direct, actionable conclusion
+- **Detailed Analysis**: Comprehensive scientific reasoning with:
+  • Molecular mechanisms and target pathways
+  • Clinical evidence and study outcomes
+  • Comparative effectiveness (if applicable)
+  • Safety profiles and contraindications
+  • Current research gaps and future directions
+
+SCIENTIFIC STANDARDS:
+- Use precise medical terminology
+- Cite specific entities from the knowledge graph
+- Distinguish between established facts and emerging evidence
+- Provide confidence levels where appropriate
+- Maintain objectivity and acknowledge uncertainties
+
+Please provide a rigorous scientific analysis based on the available graph data."""
+
+        return prompt
     
-    def drug_repurposing_prompt(self, query: str, context: str) -> str:
-        return f"""{self.system_prompt}
+    @staticmethod
+    def comparative_drug_prompt(query: str, context: str, entities: dict) -> str:
+        """Specialized prompt for drug comparison queries."""
+        
+        drugs = entities.get('drugs', [])
+        diseases = entities.get('diseases', [])
+        
+        prompt = f"""You are conducting a systematic review for: {query}
 
-QUERY: {query}
+CLINICAL CONTEXT:
+- Target Drugs: {[d['name'] for d in drugs[:3]]}
+- Therapeutic Areas: {[d['name'] for d in diseases[:3]]}
 
-KNOWLEDGE GRAPH CONTEXT:
+EVIDENCE BASE:
 {context}
 
-Please analyze this drug repurposing opportunity by:
+SYSTEMATIC REVIEW FRAMEWORK:
+1. **Mechanism of Action**: Compare molecular targets and pathways
+2. **Clinical Efficacy**: Evaluate therapeutic outcomes and response rates
+3. **Safety Profile**: Assess adverse events and contraindications
+4. **Patient Selection**: Identify optimal candidate populations
+5. **Clinical Positioning**: Recommend treatment sequencing
 
-1. **MOLECULAR ANALYSIS**: Examine the target proteins and pathways involved
-2. **MECHANISM EVALUATION**: Assess how the drug's mechanism could apply to the new indication  
-3. **EVIDENCE SYNTHESIS**: Consider the strength of molecular connections in the graph
-4. **RISK ASSESSMENT**: Identify potential safety concerns or contraindications
-5. **CONFIDENCE SCORING**: Rate your confidence in this repurposing opportunity
+RESPONSE REQUIREMENTS:
+- **Executive Summary**: Clear recommendation with supporting rationale
+- **Detailed Analysis**: Evidence-based comparison with specific metrics
+- **Clinical Implications**: Practical guidance for therapeutic decision-making
 
-Provide your step-by-step reasoning, then give your final recommendation with supporting evidence."""
+Provide a comprehensive clinical comparison based on the available evidence."""
 
-    def mechanism_explanation_prompt(self, query: str, context: str) -> str:
-        return f"""{self.system_prompt}
-
-QUERY: {query}
-
-KNOWLEDGE GRAPH CONTEXT:
-{context}
-
-Please explain the mechanism of action by analyzing:
-
-1. **TARGET IDENTIFICATION**: What proteins/receptors are involved?
-2. **PATHWAY ANALYSIS**: What molecular pathways are affected?
-3. **DOWNSTREAM EFFECTS**: How do these lead to therapeutic effects?
-4. **MOLECULAR INTERACTIONS**: What are the specific drug-target interactions?
-5. **SYSTEMS BIOLOGY**: How does this fit into broader biological networks?
-
-Show your reasoning process step-by-step, then provide a clear mechanistic explanation."""
-
-    def hypothesis_testing_prompt(self, query: str, context: str, statistical_data: str = "") -> str:
-        return f"""{self.system_prompt}
-
-QUERY: {query}
-
-KNOWLEDGE GRAPH CONTEXT:
-{context}
-
-STATISTICAL EVIDENCE:
-{statistical_data}
-
-For this hypothesis testing question, please:
-
-1. **HYPOTHESIS FORMULATION**: Clearly state the testable hypothesis
-2. **EVIDENCE EVALUATION**: Analyze the molecular and statistical evidence
-3. **EXPERIMENTAL DESIGN**: Suggest how to test this hypothesis
-4. **CONFOUNDING FACTORS**: Identify potential biases or limitations
-5. **STATISTICAL INTERPRETATION**: Interpret any provided statistical results
-6. **BIOLOGICAL PLAUSIBILITY**: Assess if the hypothesis makes biological sense
-
-Think through this systematically, then provide your scientific assessment."""
-
-    def drug_comparison_prompt(self, query: str, context: str) -> str:
-        return f"""{self.system_prompt}
-
-QUERY: {query}
-
-KNOWLEDGE GRAPH CONTEXT:
-{context}
-
-Compare these drugs by analyzing:
-
-1. **TARGET COMPARISON**: How do their target profiles differ?
-2. **MECHANISM DIFFERENCES**: What are the key mechanistic distinctions?
-3. **EFFICACY ANALYSIS**: Based on the molecular data, which might be more effective?
-4. **SAFETY CONSIDERATIONS**: What safety differences can be inferred?
-5. **CLINICAL IMPLICATIONS**: How would these differences affect clinical use?
-
-Reason through each comparison point, then provide your comparative analysis."""
-
-    def general_query_prompt(self, query: str, context: str) -> str:
-        return f"""{self.system_prompt}
-
-QUERY: {query}
-
-KNOWLEDGE GRAPH CONTEXT:
-{context}
-
-Please analyze this query by:
-
-1. **CONTEXT ANALYSIS**: What key information is provided in the graph data?
-2. **KNOWLEDGE SYNTHESIS**: How do the different pieces of information connect?
-3. **SCIENTIFIC REASONING**: What can we conclude from this molecular evidence?
-4. **LIMITATIONS**: What are the boundaries of what we can determine?
-5. **IMPLICATIONS**: What are the broader scientific implications?
-
-Think through this step-by-step and provide a comprehensive, evidence-based response."""
+        return prompt

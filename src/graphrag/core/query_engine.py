@@ -3,7 +3,7 @@ import logging
 from .llama_integration import LlamaGraphRAGEngine
 from .retriever import GraphRetriever
 from .context_builder import ContextBuilder
-from .prompt_templates import PromptTemplates
+from .prompt_templates import ScientificPromptTemplates
 from .vector_store import WeaviateGraphStore
 from ..generators.llm_client import OllamaClient
 from ..generators.response_builder import ResponseBuilder
@@ -21,7 +21,7 @@ class GraphRAGQueryEngine:
         self.graph = graph
         self.retriever = GraphRetriever(graph)
         self.context_builder = ContextBuilder(graph)
-        self.prompt_templates = PromptTemplates()
+        self.prompt_templates = ScientificPromptTemplates()
         self.llm_client = llm_client
         self.vector_store = vector_store
         self.response_builder = ResponseBuilder()
@@ -41,38 +41,32 @@ class GraphRAGQueryEngine:
         )
     
     def query(self, user_query: str, query_type: str = "auto", max_results: int = 15) -> Dict[str, Any]:
-        """Fixed query processing that ensures query-specific responses."""
+        """Enhanced query processing with better error handling."""
         logger.info(f"Processing query: '{user_query}'")
         
-        # Add debug call
-        debug_info = self.debug_retrieval(user_query)
-        
         try:
-            # 1. Enhanced entity retrieval
+            # 1. Entity retrieval (already working)
             entities = self._vector_entity_search(user_query, max_results)
             total_entities = sum(len(v) for v in entities.values())
             logger.info(f"Retrieved {total_entities} entities total")
             
-            # 2. Build query-specific context
+            # 2. Build context
             graph_context = self._build_graph_context(entities, user_query)
             
-            # 3. Create query-specific prompt
-            prompt = f"""You are analyzing a biomedical knowledge graph for this specific query: "{user_query}"
-
-    RETRIEVED GRAPH DATA:
-    {graph_context}
-
-    INSTRUCTIONS:
-    1. If specific entities were found, explain how they relate to the query
-    2. If relationships exist, describe the pathways or mechanisms
-    3. If no specific data was found, acknowledge this limitation
-    4. Focus ONLY on the actual graph data provided above
-    5. Do NOT provide general knowledge - only use the graph data shown
-
-    Answer the specific question: {user_query}"""
-
-            # 4. Generate response
-            reasoning, final_answer = self.llm_client.generate_with_reasoning(prompt)
+            # 3. Create prompt
+            detailed_prompt = self._create_comprehensive_prompt(user_query, graph_context, entities)
+            
+            # 4. Generate response with detailed logging
+            logger.info("Calling LLM for response generation...")
+            logger.info(f"Prompt length: {len(detailed_prompt)}")
+            
+            try:
+                reasoning, final_answer = self.llm_client.generate_with_reasoning(detailed_prompt)
+                logger.info(f"LLM returned - Reasoning: {len(reasoning)} chars, Answer: {len(final_answer)} chars")
+            except Exception as llm_error:
+                logger.error(f"LLM generation failed: {llm_error}")
+                reasoning = f"LLM generation failed: {str(llm_error)}"
+                final_answer = f"Unable to generate response due to LLM error: {str(llm_error)}"
             
             # 5. Build response
             response = {
@@ -84,7 +78,6 @@ class GraphRAGQueryEngine:
                 'query_type': query_type,
                 'confidence_score': 0.8 if total_entities > 0 else 0.3,
                 'subgraph_context': graph_context,
-                'debug_info': debug_info
             }
             
             logger.info("Query processing completed")
@@ -499,3 +492,49 @@ class GraphRAGQueryEngine:
             followups.append("What are the side effects of these drugs?")
         
         return followups[:3]
+
+    def _create_comprehensive_prompt(self, query: str, graph_context: str, entities: Dict) -> str:
+        """Create a comprehensive prompt for the LLM."""
+        
+        # Count entities by type
+        entity_counts = {k: len(v) for k, v in entities.items() if v}
+        
+        if not entity_counts:
+            return f"""Based on the drug-disease knowledge graph, I could not find specific entities for the query: "{query}"
+
+    Please provide a general response about this topic and suggest more specific terms that might yield better results."""
+
+        # Build entity summary
+        entity_summary = []
+        for entity_type, count in entity_counts.items():
+            entity_summary.append(f"{count} {entity_type}")
+        
+        prompt = f"""You are analyzing a biomedical knowledge graph to answer this query: "{query}"
+
+    RETRIEVED ENTITIES:
+    Found {', '.join(entity_summary)} relevant to your query.
+
+    DETAILED GRAPH CONTEXT:
+    {graph_context}
+
+    ANALYSIS TASK:
+    1. Examine the retrieved entities and their relationships
+    2. Focus on how they relate to the specific query
+    3. If comparing drugs (like the query), discuss their mechanisms, efficacy, and applications
+    4. Base your analysis on the graph data provided above
+    5. Provide specific insights about the entities found
+
+    Please analyze this information systematically and provide a comprehensive answer."""
+
+        return prompt
+
+    def _create_professional_prompt(self, query: str, graph_context: str, entities: Dict) -> str:
+        """Create professional scientific prompt."""
+        
+        from .prompt_templates import ScientificPromptTemplates
+        
+        # Determine query type for specialized prompts
+        if any(word in query.lower() for word in ["compare", "vs", "versus", "efficacy"]):
+            return ScientificPromptTemplates.comparative_drug_prompt(query, graph_context, entities)
+        else:
+            return ScientificPromptTemplates.biomedical_analysis_prompt(query, graph_context, entities)
