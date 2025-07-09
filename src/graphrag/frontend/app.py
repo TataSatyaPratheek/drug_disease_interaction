@@ -16,8 +16,9 @@ def main() -> None:
     st.title(config.APP_TITLE)
     st.markdown(config.APP_SUBTITLE)
 
-    # ── 1. Sidebar (fragment) ─────────────────────────────
-    user_cfg = sidebar.render_sidebar()
+    # ── 1. Sidebar ────────────────────────────────────────
+    with st.sidebar:
+        user_cfg = sidebar.render_sidebar()
 
     # ── 2. Service health banner ──────────────────────────
     srv_status = cache.check_system_status()
