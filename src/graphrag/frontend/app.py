@@ -13,27 +13,6 @@ from graphrag.frontend.components import (
 
 logger = logging.getLogger(__name__)
 
-@st.fragment
-def render_query_interface():
-    """Fragmented query interface to prevent unnecessary reruns."""
-    
-    # Handle pending follow-up
-    if st.session_state.get('pending_followup'):
-        query_text = st.session_state.pending_followup
-        st.session_state.pending_followup = None
-        query_type = "auto"
-        submitted = True
-    else:
-        # Regular query panel
-        query_text, query_type, submitted = query_panel.render_query_panel()
-    
-    return query_text, query_type, submitted
-
-@st.fragment  
-def render_response_container():
-    """Fragmented response container."""
-    response_panel.render_response()
-
 def render_fast_metrics():
     """Display fast graph metrics from cache.fast_graph_stats()."""
     stats = cache.fast_graph_stats()
@@ -46,32 +25,33 @@ def main():
     st.set_page_config(page_title=config.APP_TITLE, layout="wide", page_icon="🧬")
     state.initialize_session_state()
     
-    # Initialize conversation manager
-    ConversationManager.initialize_conversation()
-    
     st.title(config.APP_TITLE)
     st.markdown(config.APP_SUBTITLE)
-    
+
     # Sidebar with conversation history
     with st.sidebar:
         user_config = sidebar.render_sidebar()
-        ConversationManager.render_conversation_history()
-    
+
     # System status
     srv_status = cache.check_system_status()
     status.render_status_indicators(srv_status)
-    
+
     # Fast metrics
     render_fast_metrics()
     st.markdown("---")
-    
-    # Query interface (fragmented)
-    query, query_type, submitted = render_query_interface()
-    
-    # Process query
+
+    # Query interface (simplified)
+    query, query_type, submitted = query_panel.render_query_panel()
+
+    # Handle pending follow-up questions
+    if st.session_state.get('pending_followup'):
+        query = st.session_state.pending_followup
+        submitted = True
+        st.session_state.pending_followup = None
+
+    # Process query (simplified)
     if submitted and query:
         state.set_state("busy", True)
-        
         # Initialize system if needed
         if not state.get_state("system_initialized"):
             try:
@@ -81,31 +61,32 @@ def main():
                 st.error(f"System initialization failed: {e}")
                 state.set_state("busy", False)
                 return
-        
-        # Process query with conversation context
         engine = state.get_state('engine')
         if engine:
             try:
-                # Add conversation context to query
-                conversation_context = ConversationManager.get_conversation_context()
-                enhanced_query = conversation_context + query if conversation_context else query
-                
-                result = engine.query(enhanced_query, query_type=query_type)
-                
-                # Store conversation turn
-                ConversationManager.store_conversation_turn(query, result)
-                
+                result = engine.query(query, query_type=query_type, max_results=user_config.get('max_results', 15))
                 state.set_state('last_response', result)
                 state.set_state('last_query', query)
-                
             except Exception as e:
                 st.error(f"Query failed: {e}")
             finally:
                 state.set_state('busy', False)
                 st.rerun()
-    
-    # Response display (fragmented)
-    render_response_container()
+
+    # Response display (direct)
+    if state.get_state('last_response'):
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            response_panel.render_response()
+        with col2:
+            entities = state.get_state('last_response', {}).get('retrieved_data', {})
+            if any(entities.values()):
+                entity_ids = [e.get('id') for v in entities.values() for e in v if e.get('id')]
+                if entity_ids:
+                    graph = state.get_state('graph')
+                    if graph:
+                        subgraph = graph.subgraph(entity_ids).copy()
+                        visualization.render_graph_visualization(subgraph)
 
 if __name__ == "__main__":
     main()

@@ -18,22 +18,20 @@ def render_response():
     final_answer = response_data.get('response', '').strip()
     reasoning = response_data.get('reasoning', '').strip()
     
-    # Main Response Container
-    with st.container():
-        if final_answer and final_answer != "Failed to generate response. Please check Ollama setup.":
-            st.markdown("## 🎯 Executive Summary")
-            st.markdown(f"**{final_answer}**")
-            st.markdown("---")
-        else:
-            st.warning("⚠️ No response generated.")
-            return
+    # Main Response (simplified)
+    if final_answer and final_answer != "Failed to generate response. Please check Ollama setup.":
+        st.markdown("## 🎯 Final Answer")
+        st.markdown(final_answer)
+    else:
+        st.warning("⚠️ No response generated.")
+        return
 
-    # Detailed Analysis Container (Collapsible)
-    with st.expander("🧠 **Detailed Scientific Analysis**", expanded=True):
-        if reasoning and not reasoning.startswith("Error in reasoning"):
-            st.markdown(reasoning)
-        else:
-            st.warning("⚠️ No detailed analysis available.")
+    # AI Reasoning Process (simplified)
+    if reasoning and not reasoning.startswith("Error in reasoning"):
+        st.markdown("## 🧠 AI Reasoning Process")
+        st.markdown(reasoning)
+    else:
+        st.warning("⚠️ No reasoning generated.")
 
     # Citations Container
     citations = response_data.get('citations', [])
@@ -59,22 +57,7 @@ def render_response():
 
 @st.fragment
 def _handle_followup_question(question: str):
-    """Handle follow-up question with proper state management."""
-    from .conversation_manager import ConversationManager
-    
-    # Store the follow-up as a conversation turn
-    ConversationManager.store_conversation_turn(
-        question, 
-        {"response": "Follow-up question selected", "retrieved_data": {}},
-        "follow_up"
-    )
-    
-    # Set the question as the next query
+    """Handle follow-up question with simplified state management."""
+    # Simply set the question as the next query
     st.session_state.pending_followup = question
-    
-    # Clear previous results to avoid confusion
-    st.session_state.last_response = None
-    st.session_state.last_query = None
-    
-    # Trigger rerun
     st.rerun()
