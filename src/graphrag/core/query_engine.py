@@ -40,42 +40,195 @@ class GraphRAGQueryEngine:
             subgraph_retriever=self.subgraph_retriever
         )
     
-    def query(self, user_query: str, query_type: str = "auto", max_results: int = 10) -> Dict[str, Any]:
-        # All queries now go through the centralized, graph-native LlamaIndex engine
-        logger.info(f"Routing query to LlamaGraphRAGEngine: '{user_query}'")
-        return self.llama_engine.query(user_query, query_type=query_type, max_results=max_results)
+    def query(self, user_query: str, query_type: str = "auto", max_results: int = 15) -> Dict[str, Any]:
+        """Fixed query processing that ensures query-specific responses."""
+        logger.info(f"Processing query: '{user_query}'")
+        
+        # Add debug call
+        debug_info = self.debug_retrieval(user_query)
+        
+        try:
+            # 1. Enhanced entity retrieval
+            entities = self._vector_entity_search(user_query, max_results)
+            total_entities = sum(len(v) for v in entities.values())
+            logger.info(f"Retrieved {total_entities} entities total")
+            
+            # 2. Build query-specific context
+            graph_context = self._build_graph_context(entities, user_query)
+            
+            # 3. Create query-specific prompt
+            prompt = f"""You are analyzing a biomedical knowledge graph for this specific query: "{user_query}"
+
+    RETRIEVED GRAPH DATA:
+    {graph_context}
+
+    INSTRUCTIONS:
+    1. If specific entities were found, explain how they relate to the query
+    2. If relationships exist, describe the pathways or mechanisms
+    3. If no specific data was found, acknowledge this limitation
+    4. Focus ONLY on the actual graph data provided above
+    5. Do NOT provide general knowledge - only use the graph data shown
+
+    Answer the specific question: {user_query}"""
+
+            # 4. Generate response
+            reasoning, final_answer = self.llm_client.generate_with_reasoning(prompt)
+            
+            # 5. Build response
+            response = {
+                'response': final_answer,
+                'reasoning': reasoning,
+                'retrieved_data': entities,
+                'citations': self._build_citations(entities),
+                'suggested_followups': self._generate_query_specific_followups(user_query, entities),
+                'query_type': query_type,
+                'confidence_score': 0.8 if total_entities > 0 else 0.3,
+                'subgraph_context': graph_context,
+                'debug_info': debug_info
+            }
+            
+            logger.info("Query processing completed")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Query processing failed: {e}")
+            raise
+
+
+    def _build_graph_context(self, entities: Dict, query: str) -> str:
+        """Build specific context from retrieved entities and graph relationships."""
+        if not any(entities.values()):
+            return f"No specific entities found for query: '{query}'. Searching broader context..."
+        
+        context_parts = [f"GRAPH ANALYSIS FOR QUERY: '{query}'\n"]
+        
+        # Document found entities
+        total_entities = sum(len(v) for v in entities.values())
+        context_parts.append(f"Found {total_entities} relevant entities in the knowledge graph:")
+        
+        all_entity_ids = []
+        
+        for entity_type, entity_list in entities.items():
+            if entity_list:
+                context_parts.append(f"\n{entity_type.upper()} ({len(entity_list)}):")
+                for entity in entity_list[:5]:  # Top 5 per type
+                    name = entity.get('name', 'Unknown')
+                    entity_id = entity.get('id', '')
+                    similarity = entity.get('similarity', 0)
+                    context_parts.append(f"- {name} (Relevance: {similarity:.3f})")
+                    
+                    if entity_id:
+                        all_entity_ids.append(entity_id)
+                        
+                        # Get immediate neighbors from graph
+                        if entity_id in self.graph:
+                            neighbors = list(self.graph.neighbors(entity_id))[:3]
+                            if neighbors:
+                                neighbor_names = []
+                                for neighbor_id in neighbors:
+                                    neighbor_data = self.graph.nodes.get(neighbor_id, {})
+                                    neighbor_name = neighbor_data.get('name', neighbor_id)
+                                    neighbor_names.append(neighbor_name)
+                                context_parts.append(f"  Connected to: {', '.join(neighbor_names)}")
+        
+        # Find relationships between entities
+        if len(all_entity_ids) >= 2:
+            context_parts.append(f"\nGRAPH RELATIONSHIPS:")
+            paths_found = 0
+            for i, entity1 in enumerate(all_entity_ids[:3]):
+                for entity2 in all_entity_ids[i+1:4]:
+                    if entity1 in self.graph and entity2 in self.graph:
+                        try:
+                            if self.graph.has_edge(entity1, entity2):
+                                edge_data = self.graph.get_edge_data(entity1, entity2)
+                                relation_type = list(edge_data.values())[0].get('type', 'connected')
+                                entity1_name = self.graph.nodes[entity1].get('name', entity1)
+                                entity2_name = self.graph.nodes[entity2].get('name', entity2)
+                                context_parts.append(f"- {entity1_name} --[{relation_type}]--> {entity2_name}")
+                                paths_found += 1
+                        except Exception as e:
+                            continue
+            
+            if paths_found == 0:
+                context_parts.append("- No direct relationships found between retrieved entities")
+        
+        return "\n".join(context_parts)
+
+
+    def _build_prompt(self, query: str, context: str, entities: Dict) -> str:
+        """Build prompt that connects query to actual retrieved data."""
+        entity_summary = []
+        for entity_type, entity_list in entities.items():
+            if entity_list:
+                entity_summary.append(f"{len(entity_list)} {entity_type}")
+        
+        prompt = f"""Based on the drug-disease knowledge graph, I found {', '.join(entity_summary)} relevant to your query.
+
+    QUERY: {query}
+
+    KNOWLEDGE GRAPH CONTEXT:
+    {context}
+
+    Please analyze this information and provide:
+    1. How the retrieved entities relate to your query
+    2. What connections exist between them in the knowledge graph
+    3. A comprehensive answer based on this specific graph data
+
+    Focus on the actual entities and relationships found, not general knowledge."""
+        
+        return prompt
+
     
     def _vector_entity_search(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
-        """Use Weaviate for vector-based entity retrieval"""
+        """Enhanced vector search with broader entity matching."""
         try:
-            logger.info(f"Starting vector search for: {query}")
+            logger.info(f"Starting vector search for: '{query}'")
             
-            # Search entities using the vector store
-            all_entities = self.vector_store.search_entities(
-                query, 
-                entity_types=["Drug", "Disease", "Protein"], 
-                n_results=max_results
-            )
+            # Expand search terms
+            search_terms = [query]
             
-            logger.info(f"Vector search returned {len(all_entities)} entities")
+            all_entities = []
+
+            for term in search_terms:
+                try:
+                    results = self.vector_store.search_entities(
+                        term,
+                        entity_types=["Drug", "Disease", "Protein"],  # Only these exist in schema
+                        n_results=15
+                    )
+                    all_entities.extend(results)
+                    logger.info(f"Term '{term}' found {len(results)} entities")
+                except Exception as e:
+                    logger.warning(f"Search for '{term}' failed: {e}")
+            
+            # Remove duplicates and group by type
+            seen_ids = set()
+            unique_entities = []
+            for entity in all_entities:
+                entity_id = entity.get('id')
+                if entity_id and entity_id not in seen_ids:
+                    seen_ids.add(entity_id)
+                    unique_entities.append(entity)
             
             # Group by type
             result = {'drugs': [], 'diseases': [], 'proteins': []}
-            for entity in all_entities:
-                entity_type = entity.get('type', 'unknown')
-                if entity_type == 'drug':
+            for entity in unique_entities[:max_results]:
+                entity_type = entity.get('type', 'unknown').lower()
+                if entity_type in ['drug', 'compound']:
                     result['drugs'].append(entity)
-                elif entity_type == 'disease':
+                elif entity_type in ['disease', 'disorder', 'syndrome']:
                     result['diseases'].append(entity)
-                elif entity_type == 'protein':
+                elif entity_type in ['protein', 'polypeptide', 'enzyme']:
                     result['proteins'].append(entity)
             
-            logger.info(f"Grouped entities: {len(result['drugs'])} drugs, {len(result['diseases'])} diseases, {len(result['proteins'])} proteins")
+            total_found = sum(len(v) for v in result.values())
+            logger.info(f"Final grouped results: {total_found} entities")
             return result
             
         except Exception as e:
             logger.error(f"Vector search failed: {e}")
             return {'drugs': [], 'diseases': [], 'proteins': []}
+
     
     def _enrich_with_graph_context(self, entities: Dict, query: str) -> str:
         """Enrich vector results with graph neighborhood context"""
@@ -273,5 +426,72 @@ class GraphRAGQueryEngine:
         
         if len(entities.get('drugs', [])) > 1:
             followups.append("How do these drugs compare?")
+        
+        return followups[:3]
+
+    def debug_retrieval(self, query: str) -> Dict:
+        """Debug what entities are actually being retrieved."""
+        print(f"\n=== DEBUGGING QUERY: '{query}' ===")
+        
+        # Test vector search
+        try:
+            vector_results = self.vector_store.search_entities(
+                query, 
+                entity_types=["Drug", "Disease", "Protein", "Polypeptide"],
+                n_results=10
+            )
+            print(f"Vector search found: {len(vector_results)} entities")
+            for i, entity in enumerate(vector_results[:5]):
+                print(f"  {i+1}. {entity.get('name', 'Unknown')} ({entity.get('type', 'unknown')}) - Score: {entity.get('similarity', 0):.3f}")
+        except Exception as e:
+            print(f"Vector search failed: {e}")
+            vector_results = []
+        
+        # Test individual term searches
+        terms = ["protein",  "disease", "drug"]
+        for term in terms:
+            try:
+                term_results = self.vector_store.search_entities(term, n_results=3)
+                print(f"Term '{term}' found: {len(term_results)} entities")
+            except Exception as e:
+                print(f"Term '{term}' search failed: {e}")
+        
+        return {"vector_results": vector_results}
+    def _build_citations(self, entities):
+        """Build citations from retrieved entities."""
+        citations = []
+        count = 1
+        for entity_type, entity_list in entities.items():
+            for entity in entity_list:
+                citation = {
+                    'id': count,
+                    'name': entity.get('name', 'Unknown'),
+                    'type': entity_type,
+                    'entity_id': entity.get('id', ''),
+                    'score': entity.get('similarity', 0.0)
+                }
+                citations.append(citation)
+                count += 1
+        return citations
+
+    def _generate_query_specific_followups(self, query: str, entities: Dict) -> List[str]:
+        """Generate follow-up questions based on the query and retrieved entities."""
+        followups = []
+        
+        if not any(entities.values()):
+            return [
+                "Try searching for more specific terms",
+                "Check if your data is properly indexed",
+                "Browse the knowledge graph manually"
+            ]
+        
+        if entities.get('proteins'):
+            followups.append("What diseases are associated with these proteins?")
+        
+        if entities.get('diseases'):
+            followups.append("What treatments are available for these conditions?")
+        
+        if entities.get('drugs'):
+            followups.append("What are the side effects of these drugs?")
         
         return followups[:3]

@@ -25,31 +25,41 @@ def load_graph_data():
 
 @st.cache_resource
 def get_weaviate_connection():
-    """Initialize and cache Weaviate vector store connection"""
+    """Initialize Weaviate client using v4 API."""
     try:
+        import weaviate
+        
+        # Use v4 API for local connection
+        client = weaviate.connect_to_local(
+            host="localhost",
+            port=8080,
+            grpc_port=50051
+        )
+        
+        # Test connection
+        if not client.is_ready():
+            raise ConnectionError("Weaviate client not ready")
+        
         from graphrag.core.vector_store import WeaviateGraphStore
-        vector_store = WeaviateGraphStore()
+        vector_store = WeaviateGraphStore(client)
         
-        # Store in session state for cleanup
-        st.session_state.vector_store = vector_store
-        
-        logger.info("✅ Weaviate connection established")
+        logger.info("✅ Weaviate v4 connection established successfully")
         return vector_store
+        
     except Exception as e:
-        logger.error(f"Failed to connect to Weaviate: {e}")
+        logger.error(f"Failed to initialize Weaviate v4 client: {e}")
         raise
 
 @st.cache_resource
 def get_ollama_client(model_name: str = "qwen3:1.7b"):
-    """Initialize and cache Ollama LLM client"""
     try:
-        from graphrag.generators.llm_client import OllamaClient
-        client = OllamaClient(model_name=model_name)
+        from graphrag.generators.llm_client import LocalOllamaClient
+        client = LocalOllamaClient(model_name=model_name)
         
-        logger.info(f"✅ Ollama client initialized with model: {model_name}")
+        logger.info(f"✅ Local Ollama client initialized with model: {model_name}")
         return client
     except Exception as e:
-        logger.error(f"Failed to initialize Ollama client: {e}")
+        logger.error(f"Failed to initialize local Ollama client: {e}")
         raise
 
 @st.cache_resource

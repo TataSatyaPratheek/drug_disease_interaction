@@ -42,9 +42,9 @@ def cleanup_resources():
     """Clean up resources and reset the session state."""
     try:
         vector_store = get_state('vector_store')
-        if vector_store:
+        if vector_store and hasattr(vector_store, 'close'):
             vector_store.close()
-            logger.info("Weaviate client closed.")
+            logger.info("Vector store connection closed.")
         
         # Reset all state keys to their defaults
         initialize_session_state()

@@ -16,27 +16,40 @@ except ImportError as e:
 from .connection_manager import WeaviateConnectionManager
 
 class WeaviateGraphStore:
-    """Weaviate v4-based vector store optimized for drug-disease knowledge graphs"""
+    """Graph store interface for Weaviate v4 vector database."""
     
-    def __init__(self, persist_directory: str = "data/weaviate_db", embedding_model: str = "all-MiniLM-L6-v2"):
-        """Initialize the WeaviateGraphStore."""
-        
-        if not WEAVIATE_AVAILABLE:
-            raise ImportError("Weaviate client is not available. Please install it with: pip install weaviate-client")
-        
+    def __init__(self, client):
+        """Initialize with Weaviate v4 client."""
+        self.client = client
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.persist_directory = Path(persist_directory)
-        self.persist_directory.mkdir(parents=True, exist_ok=True)
+        
+        # Test connection
+        try:
+            if not self.client.is_ready():
+                raise ConnectionError("Weaviate client is not ready")
+            self.logger.info("✅ WeaviateGraphStore initialized with v4 client")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize WeaviateGraphStore: {e}")
+            raise
+    
+    def close(self):
+        """Close Weaviate v4 client connection."""
+        try:
+            if hasattr(self.client, 'close'):
+                self.client.close()
+            self.logger.info("Weaviate v4 client connection closed")
+        except Exception as e:
+            self.logger.warning(f"Error closing Weaviate v4 client: {e}")
+    
+    def __del__(self):
+        """Ensure connection cleanup."""
+        try:
+            if hasattr(self.client, 'close'):
+                self.client.close()
+        except:
+            pass
 
-        # Use connection manager for Weaviate client
-        self.connection_manager = WeaviateConnectionManager(persist_directory)
-        self.client = self.connection_manager.get_client()
-        
-        # Initialize embedding model
-        self.embedding_model = SentenceTransformer(embedding_model)
-        
-        # Collection references (will be set during initialization)
-        self.collections = {}
+
     
     def __enter__(self):
         return self
@@ -345,41 +358,77 @@ class WeaviateGraphStore:
             except Exception as e:
                 self.logger.error(f"Error inserting relationship batch: {e}")
     
-    def search_entities(self, query: str, entity_types: List[str] = None, n_results: int = 10) -> List[Dict[str, Any]]:
-        """Search for entities using vector similarity"""
-        if not entity_types:
-            entity_types = ["Drug", "Disease", "Protein"]
-        
-        all_results = []
-        for entity_type in entity_types:
-            if entity_type not in self.collections:
-                continue
-            try:
-                collection = self.collections[entity_type]
-                # Generate query embedding
-                query_vector = self.embedding_model.encode(query).tolist()
-                # Perform vector search using CORRECT v4 API
-                response = collection.query.near_vector(
-                    near_vector=query_vector,
-                    limit=n_results // len(entity_types),
-                    return_metadata=MetadataQuery(distance=True),
-                    return_properties=["node_id", "name", "degree"]
-                )
-                for obj in response.objects:
-                    all_results.append({
-                        'id': obj.properties['node_id'],
-                        'name': obj.properties['name'],
-                        'type': entity_type.lower(),
-                        'similarity_score': 1 - obj.metadata.distance,
-                        'degree': obj.properties['degree']
-                    })
-            except Exception as e:
-                self.logger.error(f"Error searching {entity_type}: {e}")
-        
-        # Sort by similarity and return top results
-        all_results.sort(key=lambda x: x['similarity_score'], reverse=True)
-        return all_results[:n_results]
-    
+    def search_entities(self, query: str, entity_types: List[str] = None, n_results: int = 10) -> List[Dict]:
+        """Search entities using correct schema properties."""
+        try:
+            results = []
+            # Use only classes that exist in your schema
+            search_classes = entity_types or ["Drug", "Disease", "Protein"]
+            
+            for class_name in search_classes:
+                try:
+                    # Get collection
+                    collection = self.client.collections.get(class_name)
+                    
+                    # Define correct properties for each class based on actual schema
+                    if class_name == "Drug":
+                        properties = ["node_id", "name", "description", "indication", "mechanism_of_action"]
+                    elif class_name == "Disease":
+                        properties = ["node_id", "name", "annotation"]
+                    elif class_name == "Protein":
+                        properties = ["node_id", "name", "gene_name", "function"]
+                    else:
+                        properties = ["node_id", "name"]
+                    
+                    # Perform BM25 search with correct properties
+                    response = collection.query.bm25(
+                        query=query,
+                        limit=n_results // len(search_classes) + 1,
+                        return_properties=properties
+                    )
+                    
+                    # Process results
+                    for obj in response.objects:
+                        # Build description from available properties
+                        description_parts = []
+                        if class_name == "Drug":
+                            description_parts.extend([
+                                obj.properties.get("description", ""),
+                                obj.properties.get("indication", ""),
+                                obj.properties.get("mechanism_of_action", "")
+                            ])
+                        elif class_name == "Disease":
+                            description_parts.append(obj.properties.get("annotation", ""))
+                        elif class_name == "Protein":
+                            description_parts.extend([
+                                obj.properties.get("gene_name", ""),
+                                obj.properties.get("function", "")
+                            ])
+                        
+                        # Clean and join description
+                        description = " | ".join([part for part in description_parts if part])
+                        
+                        entity = {
+                            "id": obj.properties.get("node_id", str(obj.uuid)),
+                            "name": obj.properties.get("name", "Unknown"),
+                            "type": class_name.lower(),
+                            "description": description,
+                            "similarity": 0.8
+                        }
+                        results.append(entity)
+                        
+                except Exception as e:
+                    self.logger.warning(f"Search failed for {class_name}: {e}")
+                    continue
+            
+            results = sorted(results, key=lambda x: x.get("similarity", 0), reverse=True)[:n_results]
+            self.logger.info(f"Found {len(results)} entities for query: '{query}'")
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Weaviate search failed: {e}")
+            return []
+
     def get_statistics(self) -> Dict[str, int]:
         """Get statistics about the vector store using direct approach"""
         try:
@@ -410,9 +459,6 @@ class WeaviateGraphStore:
             self.logger.error(f"Error getting statistics: {e}")
             return {"total_entities": 0, "drugs": 0, "diseases": 0, "proteins": 0, "relationships": 0}
 
-    def close(self):
-        """Close Weaviate client using connection manager"""
-        self.connection_manager.close_connection()
 
 # Alias for backward compatibility
 GraphVectorStore = WeaviateGraphStore

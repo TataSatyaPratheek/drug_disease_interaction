@@ -59,3 +59,9 @@ SUCCESS_MESSAGES = {
     "query_submitted": "📤 Query submitted for processing...",
     "backend_ready": "🚀 Backend services are ready.",
 }
+
+# Add privacy notice
+PRIVACY_NOTICE = """
+🔒 **Complete Local Privacy**: This system operates entirely on your local device. 
+No data leaves your machine. All models run locally without internet connections.
+"""
