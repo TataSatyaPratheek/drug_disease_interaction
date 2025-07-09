@@ -46,10 +46,9 @@ class WeaviateGraphStore:
         try:
             if hasattr(self.client, 'close'):
                 self.client.close()
-        except:
-            pass
-
-
+                self.logger.info("Weaviate client connection closed")
+        except Exception as e:
+            self.logger.warning(f"Error closing Weaviate client: {e}")
     
     def __enter__(self):
         return self

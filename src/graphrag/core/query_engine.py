@@ -94,7 +94,6 @@ class GraphRAGQueryEngine:
             logger.error(f"Query processing failed: {e}")
             raise
 
-
     def _build_graph_context(self, entities: Dict, query: str) -> str:
         """Build specific context from retrieved entities and graph relationships."""
         if not any(entities.values()):
@@ -120,16 +119,23 @@ class GraphRAGQueryEngine:
                     if entity_id:
                         all_entity_ids.append(entity_id)
                         
-                        # Get immediate neighbors from graph
+                        # Get immediate neighbors from graph - FIX HERE
                         if entity_id in self.graph:
                             neighbors = list(self.graph.neighbors(entity_id))[:3]
                             if neighbors:
                                 neighbor_names = []
                                 for neighbor_id in neighbors:
                                     neighbor_data = self.graph.nodes.get(neighbor_id, {})
-                                    neighbor_name = neighbor_data.get('name', neighbor_id)
-                                    neighbor_names.append(neighbor_name)
-                                context_parts.append(f"  Connected to: {', '.join(neighbor_names)}")
+                                    neighbor_name = neighbor_data.get('name', neighbor_id)  # Use ID as fallback
+                                    # Ensure we have a string value
+                                    if neighbor_name:
+                                        neighbor_names.append(str(neighbor_name))
+                                    else:
+                                        neighbor_names.append(str(neighbor_id))
+                                
+                                # Only add if we have valid names
+                                if neighbor_names:
+                                    context_parts.append(f"  Connected to: {', '.join(neighbor_names)}")
         
         # Find relationships between entities
         if len(all_entity_ids) >= 2:
@@ -154,7 +160,6 @@ class GraphRAGQueryEngine:
         
         return "\n".join(context_parts)
 
-
     def _build_prompt(self, query: str, context: str, entities: Dict) -> str:
         """Build prompt that connects query to actual retrieved data."""
         entity_summary = []
@@ -178,7 +183,6 @@ class GraphRAGQueryEngine:
         
         return prompt
 
-    
     def _vector_entity_search(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
         """Enhanced vector search with broader entity matching."""
         try:
@@ -229,7 +233,6 @@ class GraphRAGQueryEngine:
             logger.error(f"Vector search failed: {e}")
             return {'drugs': [], 'diseases': [], 'proteins': []}
 
-    
     def _enrich_with_graph_context(self, entities: Dict, query: str) -> str:
         """Enrich vector results with graph neighborhood context"""
         contexts = []
@@ -457,6 +460,7 @@ class GraphRAGQueryEngine:
                 print(f"Term '{term}' search failed: {e}")
         
         return {"vector_results": vector_results}
+    
     def _build_citations(self, entities):
         """Build citations from retrieved entities."""
         citations = []
