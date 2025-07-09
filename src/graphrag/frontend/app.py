@@ -87,14 +87,17 @@ def main() -> None:
             response_panel.render_response()
         with col2:
             g = state.get_state("graph")
-            ent_ids = [
-                e["id"]
-                for lst in state.get_state("last_response")["retrieved_data"].values()
-                for e in lst if e.get("id")
-            ]
-            if g and ent_ids:
-                sub = g.subgraph(ent_ids).copy()
-                visualization.render_graph_visualization(sub)
+            response_data = state.get_state("last_response")
+            if g and response_data:
+                retrieved_data = response_data.get("retrieved_data", {})
+                ent_ids = [
+                    e["id"]
+                    for lst in retrieved_data.values()
+                    for e in lst if e.get("id")
+                ]
+                if ent_ids:
+                    sub = g.subgraph([node for node in ent_ids if node in g]).copy()
+                    visualization.render_graph_visualization(sub)
 
 if __name__ == "__main__":
     main()

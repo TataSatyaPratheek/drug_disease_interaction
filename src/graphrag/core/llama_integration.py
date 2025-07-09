@@ -83,51 +83,45 @@ class GraphRAGRetriever(BaseRetriever):
         # 1. Vector search for seed entities
         vector_results = self.vector_store.search_entities(
             query_str, 
-            entity_types=["Drug", "Disease", "Protein"],
-            n_results=self.top_k
+            entity_types=["Drug", "Disease", "Protein", "Polypeptide"],
+            n_results=5 # Get a smaller, high-confidence set of seed nodes
         )
         
         # 2. Graph expansion
         nodes_with_scores = []
+        seed_entities = [res for res in vector_results if res.get('id')]
+        seed_ids = [e['id'] for e in seed_entities]
         
-        for entity in vector_results[:5]:  # Top 5 for graph expansion
-            entity_id = entity.get('id')
-            if not entity_id:
-                continue
-            
-            # Create LlamaIndex node
+        for entity in seed_entities:
             node_content = self._create_node_content(entity)
             node = NodeWithScore(
                 node=node_content,
                 score=entity.get('similarity', 0.0)
             )
             nodes_with_scores.append(node)
-            
-            # Add neighborhood context
-            neighborhood = self.subgraph_retriever.get_subgraph(
-                entity_id, 
-                max_nodes=20
-            )
-            
-            for neighbor_id in list(neighborhood.nodes())[:5]:
-                neighbor_data = neighborhood.nodes[neighbor_id]
-                neighbor_content = self._create_node_content({
-                    'id': neighbor_id,
-                    'name': neighbor_data.get('name', neighbor_id),
-                    'type': neighbor_data.get('type', 'unknown')
-                })
-                
-                neighbor_node = NodeWithScore(
-                    node=neighbor_content,
-                    score=entity.get('similarity', 0.0) * 0.7  # Penalty for indirect
-                )
-                nodes_with_scores.append(neighbor_node)
+
+        # 3. Path Finding Context (if multiple entities are found)
+        if len(seed_ids) >= 2:
+            # Attempt to find paths between the top 2 seed entities
+            paths = self.path_retriever.find_drug_disease_paths(seed_ids[0], seed_ids[1], max_paths=2)
+            if paths:
+                path_context = self._create_path_content(paths)
+                path_node = NodeWithScore(node=path_context, score=0.85) # High score for direct paths
+                nodes_with_scores.append(path_node)
         
-        # 3. Community context
+        # 4. Neighborhood Context
+        if seed_ids:
+            neighborhood_subgraph = self.subgraph_retriever.get_entity_subgraph(seed_ids, hops=1)
+            if neighborhood_subgraph.number_of_nodes() > len(seed_ids):
+                neighborhood_context = self._create_subgraph_content(neighborhood_subgraph)
+                neighborhood_node = NodeWithScore(node=neighborhood_context, score=0.7)
+                nodes_with_scores.append(neighborhood_node)
+        
+        # 5. Community context
         try:
-            if vector_results:
+            if seed_ids:
                 communities = self.community_retriever.get_communities(
-                    [r.get('id') for r in vector_results[:3]]
+                    seed_ids
                 )
                 
                 if communities:
@@ -140,9 +134,34 @@ class GraphRAGRetriever(BaseRetriever):
         except Exception as e:
             logger.warning(f"Community retrieval failed: {e}")
         
-        # Sort by score and return top results
+        # Sort by score and return all enriched context nodes
         nodes_with_scores.sort(key=lambda x: x.score, reverse=True)
-        return nodes_with_scores[:self.top_k]
+        return nodes_with_scores
+    def _create_path_content(self, paths: List[Dict]) -> Any:
+        """Create a LlamaIndex node from retrieved paths."""
+        from llama_index.core.schema import TextNode
+
+        path_text = "Found Explanatory Paths:\n"
+        for i, path_data in enumerate(paths):
+            path_str = " -> ".join(path_data.get('path_names', []))
+            path_text += f"  Path {i+1}: {path_str}\n"
+
+        return TextNode(
+            text=path_text,
+            metadata={'content_type': 'path_context'}
+        )
+
+    def _create_subgraph_content(self, subgraph: nx.MultiDiGraph) -> Any:
+        """Create a LlamaIndex node from a neighborhood subgraph."""
+        from llama_index.core.schema import TextNode
+
+        subgraph_text = (
+            f"Neighborhood Context: A subgraph of {subgraph.number_of_nodes()} entities and "
+            f"{subgraph.number_of_edges()} relationships was found around the core entities."
+        )
+        return TextNode(
+            text=subgraph_text, metadata={'content_type': 'subgraph_context'}
+        )
     
     def _create_node_content(self, entity: Dict[str, Any]) -> Any:
         """Create LlamaIndex node content from entity data."""

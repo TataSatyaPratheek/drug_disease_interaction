@@ -149,11 +149,10 @@ def determine_enhanced_strategy(query_type: str, extracted_entities: Dict[str, L
         return QueryStrategy.PATHWAY_TRAVERSAL
     elif query_type == "repurposing":
         return QueryStrategy.COMMUNITY_ANALYSIS
-    elif total_entities == 0:
-        return QueryStrategy.VECTOR_ONLY
     elif total_entities == 1:
         return QueryStrategy.ENTITY_EXPANSION
     else:
+        # Default to a broader analysis if multiple entities or ambiguous query
         return QueryStrategy.MULTI_ENTITY_ANALYSIS
 
 def generate_processing_reasoning(query_type: str, entities: Dict, strategy: QueryStrategy) -> str:

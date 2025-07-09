@@ -41,32 +41,9 @@ class GraphRAGQueryEngine:
         )
     
     def query(self, user_query: str, query_type: str = "auto", max_results: int = 10) -> Dict[str, Any]:
-        """Enhanced GraphRAG pipeline with strategy-based routing."""
-        logger.info(f"Query received: {user_query}")
-        logger.info(f"Query type: {query_type}")
-        
-        # Enhanced preprocessing
-        processed_query = preprocess_query(user_query, max_results)
-        logger.info(f"Query preprocessed: {processed_query.query_type}")
-        
-        if query_type == "auto":
-            query_type = processed_query.query_type
-            
-        # Route based on strategy
-        strategy = processed_query.strategy
-        logger.info(f"Using strategy: {strategy}")
-
-        if strategy == QueryStrategy.COMPARATIVE_ANALYSIS:
-            return self._handle_comparative_analysis(processed_query)
-        elif strategy == QueryStrategy.PATHWAY_TRAVERSAL:
-            return self._handle_pathway_traversal(processed_query)
-        elif strategy == QueryStrategy.COMMUNITY_ANALYSIS:
-            return self._handle_community_analysis(processed_query)
-        elif strategy == QueryStrategy.MULTI_ENTITY_ANALYSIS:
-            return self._handle_multi_entity_analysis(processed_query)
-        else:
-            # Fallback to basic query processing
-            return self._handle_basic_query(processed_query)
+        # All queries now go through the centralized, graph-native LlamaIndex engine
+        logger.info(f"Routing query to LlamaGraphRAGEngine: '{user_query}'")
+        return self.llama_engine.query(user_query, query_type=query_type, max_results=max_results)
     
     def _vector_entity_search(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
         """Use Weaviate for vector-based entity retrieval"""
