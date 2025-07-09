@@ -25,11 +25,9 @@ def render_query_panel() -> tuple[str | None, str | None, bool]:
             index=0,
         )
 
-        submitted = st.form_submit_button("▶ Process Query", use_container_width=True)
+        submitted = st.form_submit_button("▶ Process Query", use_container_width=True, disabled=state.get_state("busy"))
 
     if submitted and query_text.strip():
-        # prevent double-clicks while the back-end is busy
-        state.set_state("busy", True)
         logger.info(f"Query submitted: {query_text.strip()}")
         return query_text.strip(), query_type, True
 

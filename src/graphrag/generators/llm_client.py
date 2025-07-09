@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import re
-import ssl
 from typing import Dict, List, Tuple
 
 import ollama
@@ -16,11 +15,8 @@ LOGGER = logging.getLogger(__name__)
 
 class OllamaClient:
     """
-    Wrapper that:
-
-    1. Connects over plain HTTP by default.
-    2. Retries once with `verify=False` if the local CA bundle is missing.
-    3. Provides helpers for step-by-step reasoning extraction.
+    Wrapper that connects over plain HTTP and provides helpers for
+    step-by-step reasoning extraction.
     """
 
     def __init__(
@@ -37,61 +33,37 @@ class OllamaClient:
         self.port = port
         self.temperature = temperature
 
-        # 1st attempt – normal verify
-        scheme = "http"  # use http, TLS off
-        try:
-            self.client = ollama.Client(
-                host=f"{scheme}://{host}:{port}",
-                timeout=timeout,
-                tls=False,
-                verify=False,      # may fail on mis-installed root CAs
-            )
-        except ssl.SSLError as e:  # pragma: no cover
-            LOGGER.warning(
-                "SSL verification failed when contacting Ollama (%s). "
-                "Retrying with verify=False. NOTE: connection is local-host only.",
-                e,
-            )
-            self.client = ollama.Client(
-                host=f"{scheme}://{host}:{port}",
-                timeout=timeout,
-                tls=False,
-                verify=False,    # ← skips CA lookup, fixes NO_CERTIFICATE_OR_CRL_FOUND
-            )
+        # Simplified client initialization for broader compatibility.
+        # The http:// prefix ensures a non-SSL connection.
+        self.client = ollama.Client(
+            host=f"http://{host}:{port}",
+            timeout=timeout,
+        )
 
         # Verify that the server is reachable and the model exists
         self._ensure_model_available()
 
-    # --------------------------------------------------------------------- #
-    #                           Private helpers                             #
-    # --------------------------------------------------------------------- #
     def _ensure_model_available(self) -> None:
         """Pull `self.model_name` if it is not present locally."""
         try:
             models_resp = self.client.list()
-            # The response shape differs between client versions; normalise:
             raw_list = (
-                models_resp.models
-                if hasattr(models_resp, "models")
-                else models_resp.get("models", models_resp)
+                models_resp.get("models", models_resp)
             )
             available = {
-                (m.model if hasattr(m, "model") else m.get("name", str(m))).split(":")[0]
+                m.get("name", str(m)).split(":")[0]
                 for m in raw_list
             }
 
             if self.model_name.split(":")[0] not in available:
-                LOGGER.info("Pulling Ollama model '%s'…", self.model_name)
+                LOGGER.info("Pulling Ollama model '%s'...", self.model_name)
                 self.client.pull(self.model_name)
                 LOGGER.info("Model pulled successfully.")
-        except (HTTPError, TimeoutException, ssl.SSLError) as exc:  # pragma: no cover
+        except (HTTPError, TimeoutException) as exc:
             LOGGER.error("Failed to communicate with Ollama: %s", exc)
             raise
 
-    # --------------------------------------------------------------------- #
-    #                         Public generation APIs                        #
-    # --------------------------------------------------------------------- #
-    def generate_with_reasoning(  # noqa: D401
+    def generate_with_reasoning(
         self, prompt: str, *, max_tokens: int = 2048
     ) -> Tuple[str, str]:
         """
@@ -120,7 +92,7 @@ class OllamaClient:
                     "repeat_penalty": 1.1,
                 },
             )
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             LOGGER.error("Generation failed: %s", exc)
             raise
 
@@ -146,14 +118,10 @@ class OllamaClient:
         )
         return rsp["message"]["content"]
 
-    # ------------------------------------------------------------------ #
-    #                        Parsing utilities                           #
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _split_response(response: str) -> Tuple[str, str]:
         """
         Extract reasoning & final answer blocks from qwen-style output.
-        Falls back gracefully if the pattern is absent.
         """
         m = re.search(
             r"🧠.*?REASONING.*?:\s*(.*?)\s*🎯.*?FINAL ANSWER.*?:\s*(.*)",
@@ -163,19 +131,16 @@ class OllamaClient:
         if m:
             return m.group(1).strip(), m.group(2).strip()
 
-        # Fallback heuristics
-        up = response.upper()
-        if "REASONING:" in up and "FINAL ANSWER:" in up:
-            reasoning, _, final_ans = response.partition("FINAL ANSWER:")
-            return reasoning.replace("REASONING:", "").strip(), final_ans.strip()
+        # Fallback heuristic
+        if "FINAL ANSWER:" in response.upper():
+            parts = re.split(r'FINAL ANSWER.*?:', response, flags=re.IGNORECASE)
+            if len(parts) >= 2:
+                reasoning_part = parts[0].replace("REASONING:", "").strip()
+                return reasoning_part, parts[1].strip()
+        
+        return "Direct response without explicit reasoning.", response
 
-        half = len(response) // 2
-        return response[:half].strip(), response[half:].strip()
 
-
-# --------------------------------------------------------------------- #
-#                     Lightweight embedding helper                      #
-# --------------------------------------------------------------------- #
 class EmbeddingClient:
     """Uses sentence-transformers locally; avoids Ollama for embeddings."""
 
@@ -189,3 +154,4 @@ class EmbeddingClient:
 
     def encode_single(self, text: str) -> List[float]:
         return self.model.encode([text])[0].tolist()
+

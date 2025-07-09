@@ -1,4 +1,5 @@
 from typing import Dict, List, Any
+import logging
 from .llama_integration import LlamaGraphRAGEngine
 from .retriever import GraphRetriever
 from .context_builder import ContextBuilder
@@ -9,6 +10,8 @@ from ..generators.response_builder import ResponseBuilder
 from ..retrievers import SubgraphRetriever, PathRetriever, CommunityRetriever
 from .query_processor import preprocess_query, classify_query_type, QueryStrategy
 from .result_aggregator import aggregate_search_results, format_results_for_llm, generate_followup_questions
+
+logger = logging.getLogger(__name__)
 
 
 class GraphRAGQueryEngine:
@@ -26,6 +29,7 @@ class GraphRAGQueryEngine:
         self.path_retriever = PathRetriever(graph)
         self.community_retriever = CommunityRetriever(graph)
 
+        logger.info("GraphRAGQueryEngine initialized successfully")
         # Initialize LlamaIndex integration
         self.llama_engine = LlamaGraphRAGEngine(
             nx_graph=graph,
@@ -38,12 +42,19 @@ class GraphRAGQueryEngine:
     
     def query(self, user_query: str, query_type: str = "auto", max_results: int = 10) -> Dict[str, Any]:
         """Enhanced GraphRAG pipeline with strategy-based routing."""
+        logger.info(f"Query received: {user_query}")
+        logger.info(f"Query type: {query_type}")
+        
         # Enhanced preprocessing
         processed_query = preprocess_query(user_query, max_results)
+        logger.info(f"Query preprocessed: {processed_query.query_type}")
+        
         if query_type == "auto":
             query_type = processed_query.query_type
+            
         # Route based on strategy
         strategy = processed_query.strategy
+        logger.info(f"Using strategy: {strategy}")
 
         if strategy == QueryStrategy.COMPARATIVE_ANALYSIS:
             return self._handle_comparative_analysis(processed_query)
@@ -54,29 +65,39 @@ class GraphRAGQueryEngine:
         elif strategy == QueryStrategy.MULTI_ENTITY_ANALYSIS:
             return self._handle_multi_entity_analysis(processed_query)
         else:
-            # Use LlamaIndex for complex queries
-            return self.llama_engine.query(processed_query.cleaned_query)
+            # Fallback to basic query processing
+            return self._handle_basic_query(processed_query)
     
     def _vector_entity_search(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
         """Use Weaviate for vector-based entity retrieval"""
         try:
+            logger.info(f"Starting vector search for: {query}")
+            
+            # Search entities using the vector store
             all_entities = self.vector_store.search_entities(
                 query, 
                 entity_types=["Drug", "Disease", "Protein"], 
                 n_results=max_results
             )
+            
+            logger.info(f"Vector search returned {len(all_entities)} entities")
+            
+            # Group by type
             result = {'drugs': [], 'diseases': [], 'proteins': []}
             for entity in all_entities:
-                entity_type = entity['type']
+                entity_type = entity.get('type', 'unknown')
                 if entity_type == 'drug':
                     result['drugs'].append(entity)
                 elif entity_type == 'disease':
                     result['diseases'].append(entity)
                 elif entity_type == 'protein':
                     result['proteins'].append(entity)
+            
+            logger.info(f"Grouped entities: {len(result['drugs'])} drugs, {len(result['diseases'])} diseases, {len(result['proteins'])} proteins")
             return result
+            
         except Exception as e:
-            self.logger.error(f"Vector search failed: {e}")
+            logger.error(f"Vector search failed: {e}")
             return {'drugs': [], 'diseases': [], 'proteins': []}
     
     def _enrich_with_graph_context(self, entities: Dict, query: str) -> str:
@@ -217,3 +238,63 @@ class GraphRAGQueryEngine:
     def _handle_multi_entity_analysis(self, processed_query) -> Dict[str, Any]:
         """Handle multi-entity analysis."""
         return self.llama_engine.query(processed_query.cleaned_query)
+    
+    def _handle_basic_query(self, processed_query) -> Dict[str, Any]:
+        """Handle basic queries using vector search + graph context."""
+        logger.info("Using basic query handler")
+        
+        try:
+            # 1. Vector search for entities
+            entities = self._vector_entity_search(processed_query.cleaned_query, 10)
+            logger.info(f"Vector search found: {sum(len(v) for v in entities.values())} entities")
+            
+            # 2. Build graph context
+            context = self._enrich_with_graph_context(entities, processed_query.cleaned_query)
+            logger.info(f"Built context length: {len(context)}")
+            
+            # 3. Generate response using LLM
+            prompt = self.prompt_templates.general_query_prompt(processed_query.cleaned_query, context)
+            reasoning, final_answer = self.llm_client.generate_with_reasoning(prompt)
+            logger.info("LLM response generated")
+            
+            # 4. Generate follow-ups
+            followups = self._generate_followups(processed_query.cleaned_query, entities)
+            
+            # 5. Build final response
+            response = self.response_builder.build_response(
+                query=processed_query.cleaned_query,
+                llm_response=final_answer,
+                retrieved_data=entities,
+                subgraph_context=context,
+                query_type=processed_query.query_type,
+                confidence_score=0.7,
+                reasoning=reasoning,
+                suggested_followups=followups
+            )
+            
+            logger.info("Response built successfully")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Basic query processing failed: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            raise
+    
+    def _generate_followups(self, query: str, entities: Dict) -> List[str]:
+        """Generate follow-up questions based on entities found."""
+        followups = []
+        
+        if entities.get('drugs'):
+            followups.append("What are the side effects of these drugs?")
+        
+        if entities.get('diseases'):
+            followups.append("What other treatments are available?")
+        
+        if entities.get('proteins'):
+            followups.append("What other drugs target these proteins?")
+        
+        if len(entities.get('drugs', [])) > 1:
+            followups.append("How do these drugs compare?")
+        
+        return followups[:3]

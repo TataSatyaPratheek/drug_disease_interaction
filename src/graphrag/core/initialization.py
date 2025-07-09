@@ -85,6 +85,11 @@ def initialize_graphrag_system() -> Tuple:
         from graphrag.core.query_engine import GraphRAGQueryEngine
         engine = GraphRAGQueryEngine(graph, llm_client, vector_store)
         
+        # Test the engine
+        logger.info("Testing query engine...")
+        test_result = engine._vector_entity_search("test", 1)
+        logger.info(f"Engine test result: {test_result}")
+        
         logger.info("✅ GraphRAG system initialization complete")
         return graph, vector_store, llm_client, engine
         

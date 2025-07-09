@@ -41,44 +41,43 @@ def main() -> None:
     # ── 5. Query panel (fragment) ─────────────────────────
     query, query_type, submitted = query_panel.render_query_panel()
     
-    if submitted and query and not state.get_state("busy"):
-        # Set busy state immediately
+    if submitted:
+        if not query:
+            st.warning("Please enter a query.")
+            st.stop()
+
         state.set_state("busy", True)
-        
-        # initialise on demand
+        # No spinner here; load_system_resources will create its own st.status
+        # Initialize on demand
         if not state.get_state("system_initialized"):
-            with st.spinner("🚀 Initialising back-end…"):
-                try:
-                    graph, vector_store, llm_client, engine = cache.load_system_resources()
-                    state.store_system_components(graph, vector_store, llm_client, engine)
-                    st.success("✅ System initialized successfully!")
-                except Exception as e:
-                    st.error(f"Failed to initialize system: {e}")
-                    state.set_state("busy", False)
-                    st.stop()
+            try:
+                graph, vector_store, llm_client, engine = cache.load_system_resources()
+                state.store_system_components(graph, vector_store, llm_client, engine)
+            except Exception as e:
+                # The error is already displayed by the cached function
+                state.set_state("busy", False)
+                st.stop()
 
         # Process the query
         engine = state.get_state('engine')
         if engine:
             with st.spinner("🔍 Processing query..."):
                 try:
-                    user_config = state.get_state("user_config", {"max_results": 10})
                     result = engine.query(
                         query,
                         query_type=query_type,
-                        max_results=user_config.get('max_results', 10)
+                        max_results=user_config.get('max_results', 15)
                     )
                     state.set_state('last_response', result)
                     state.set_state('last_query', query)
-                    st.success("✅ Query processed successfully!")
                 except Exception as e:
                     st.error(f"Query processing failed: {e}")
-                    logger.error(f"Query processing error: {e}")
+                    logger.error(f"Query processing error: {e}", exc_info=True)
                 finally:
                     state.set_state('busy', False)
                     st.rerun()
         else:
-            st.error("Engine not initialized")
+            st.error("❌ Engine not initialized. Cannot process query.")
             state.set_state("busy", False)
 
     # ── 6. Response & graph ───────────────────────────────
