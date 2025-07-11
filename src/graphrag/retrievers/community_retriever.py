@@ -12,52 +12,40 @@ class CommunityRetriever:
     
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
-        self.analytics = HighPerformanceGraphAnalytics(graph)
+        self.analytics = None  # Lazy initialization
         self.resilience = ConnectionResilience()
         self.logger = logging.getLogger(__name__)
 
+    def _ensure_analytics(self):
+        """Lazy initialization of analytics."""
+        if self.analytics is None:
+            self.analytics = HighPerformanceGraphAnalytics(self.graph)
+
     @ConnectionResilience.with_retry(max_attempts=3, wait_seconds=1)
     def get_communities(self, node_ids: List[str], algorithm: str = 'louvain') -> List[Dict[str, Any]]:
-        """Get communities for specified nodes using high-performance algorithms."""
+        """Get communities for specified nodes using optimized algorithms."""
         try:
-            # Use high-performance igraph-based community detection
+            self._ensure_analytics()
+            # Use pre-computed or efficient community detection
             community_data = self.analytics.detect_communities(algorithm)
-            
             # Filter communities that contain target nodes
             relevant_communities = []
             for community in community_data['communities']:
                 if any(node in community['nodes'] for node in node_ids):
-                    # Add additional metadata
-                    community_nodes = community['nodes']
-                    
-                    # Calculate community centrality
-                    centrality_metrics = self.analytics.compute_centrality_metrics()
-                    avg_centrality = sum(
-                        centrality_metrics['pagerank'].get(node, 0) 
-                        for node in community_nodes
-                    ) / len(community_nodes)
-                    
+                    # Simplified metadata to reduce memory usage
                     enhanced_community = {
                         'id': community['id'],
-                        'nodes': community_nodes,
+                        'nodes': community['nodes'][:10],  # Limit to first 10 nodes
                         'size': community['size'],
                         'modularity': community_data['modularity'],
-                        'avg_centrality': avg_centrality,
                         'algorithm': algorithm,
-                        'node_types': self._get_community_node_types(community_nodes),
-                        'description': self._generate_community_description(community_nodes)
+                        'description': self._generate_community_description(community['nodes'][:5])
                     }
                     relevant_communities.append(enhanced_community)
-            
-            # Sort by relevance (combination of size and centrality)
-            relevant_communities.sort(
-                key=lambda x: x['size'] * x['avg_centrality'], 
-                reverse=True
-            )
-            
+            # Sort by size (simpler sorting)
+            relevant_communities.sort(key=lambda x: x['size'], reverse=True)
             self.logger.info(f"Found {len(relevant_communities)} relevant communities")
-            return relevant_communities
-            
+            return relevant_communities[:5]  # Return max 5 communities
         except Exception as e:
             self.logger.error(f"Community retrieval failed: {e}")
             return []

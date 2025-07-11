@@ -1,5 +1,6 @@
 """High-performance graph analytics using python-igraph."""
 
+
 import igraph as ig
 import networkx as nx
 import numpy as np
@@ -7,6 +8,8 @@ from typing import Dict, List, Tuple, Optional, Any
 import logging
 from dataclasses import dataclass
 import streamlit as st
+import json
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -24,44 +27,70 @@ class HighPerformanceGraphAnalytics:
     
     def __init__(self, nx_graph: nx.MultiDiGraph):
         self.nx_graph = nx_graph
-        self._ig_graph = None
-        self._node_mapping = {}
-        self._reverse_mapping = {}
-        self._initialize_igraph()
-    
-    def _initialize_igraph(self):
-        """Convert NetworkX graph to igraph for performance."""
+        self._ig_graph = None  # Lazy initialization
+        self._node_mapping = None
+        self._reverse_mapping = None
+        self._initialized = False
+        self._precomputed_dir = Path("data/analytics")
+        self._centrality_cache = None
+        self._community_cache = None
+
+    def _load_precomputed_data(self):
+        """Load pre-computed analytics data."""
         try:
+            # Load centrality data
+            centrality_file = self._precomputed_dir / 'centrality_metrics.json'
+            if centrality_file.exists():
+                with open(centrality_file, 'r') as f:
+                    self._centrality_cache = json.load(f)
+                logger.info("Loaded pre-computed centrality metrics")
+            # Load community data
+            community_file = self._precomputed_dir / 'community_data.json'
+            if community_file.exists():
+                with open(community_file, 'r') as f:
+                    self._community_cache = json.load(f)
+                logger.info("Loaded pre-computed community data")
+            # Load mappings
+            mapping_file = self._precomputed_dir / 'graph_mappings.json'
+            if mapping_file.exists():
+                with open(mapping_file, 'r') as f:
+                    mapping_data = json.load(f)
+                    self._node_mapping = mapping_data['node_mapping']
+                    self._reverse_mapping = {int(k): v for k, v in mapping_data['reverse_mapping'].items()}
+                logger.info("Loaded pre-computed graph mappings")
+        except Exception as e:
+            logger.warning(f"Failed to load pre-computed data: {e}")
+    
+    def _ensure_initialized(self):
+        """Lazy initialization of igraph conversion."""
+        if self._initialized:
+            return
+        try:
+            logger.info("Initializing igraph conversion (lazy loading)...")
             # Create node mapping
             nodes = list(self.nx_graph.nodes())
             self._node_mapping = {node: i for i, node in enumerate(nodes)}
             self._reverse_mapping = {i: node for node, i in self._node_mapping.items()}
-            
             # Create edge list for igraph
             edges = []
             edge_attrs = {'weight': [], 'type': []}
-            
             for u, v, data in self.nx_graph.edges(data=True):
                 edges.append((self._node_mapping[u], self._node_mapping[v]))
                 edge_attrs['weight'].append(data.get('weight', 1.0))
                 edge_attrs['type'].append(data.get('type', 'unknown'))
-            
             # Create igraph
             self._ig_graph = ig.Graph(edges, directed=True)
-            
             # Add node attributes
             self._ig_graph.vs['name'] = [self._reverse_mapping[i] for i in range(len(nodes))]
             self._ig_graph.vs['type'] = [
                 self.nx_graph.nodes[self._reverse_mapping[i]].get('type', 'unknown') 
                 for i in range(len(nodes))
             ]
-            
             # Add edge attributes
             self._ig_graph.es['weight'] = edge_attrs['weight']
             self._ig_graph.es['type'] = edge_attrs['type']
-            
+            self._initialized = True
             logger.info(f"Initialized igraph with {len(nodes)} nodes and {len(edges)} edges")
-            
         except Exception as e:
             logger.error(f"Failed to initialize igraph: {e}")
             raise
@@ -70,60 +99,52 @@ class HighPerformanceGraphAnalytics:
     def compute_centrality_metrics(_self) -> Dict[str, Dict[str, float]]:
         """Compute multiple centrality metrics efficiently."""
         try:
+            # Try to use pre-computed data first
+            if _self._centrality_cache is None:
+                _self._load_precomputed_data()
+            if _self._centrality_cache:
+                logger.info("Using pre-computed centrality metrics")
+                return _self._centrality_cache
+            # Fallback to lazy initialization only if needed
+            _self._ensure_initialized()
             metrics = {}
-            
             # PageRank centrality
             pagerank = _self._ig_graph.pagerank(weights='weight')
             metrics['pagerank'] = {
                 _self._reverse_mapping[i]: score 
                 for i, score in enumerate(pagerank)
             }
-            
             # Betweenness centrality
             betweenness = _self._ig_graph.betweenness(weights='weight')
             metrics['betweenness'] = {
                 _self._reverse_mapping[i]: score 
                 for i, score in enumerate(betweenness)
             }
-            
-            # Closeness centrality
-            closeness = _self._ig_graph.closeness(weights='weight')
-            metrics['closeness'] = {
-                _self._reverse_mapping[i]: score 
-                for i, score in enumerate(closeness)
-            }
-            
-            # Degree centrality
-            degree = _self._ig_graph.degree()
-            metrics['degree'] = {
-                _self._reverse_mapping[i]: score 
-                for i, score in enumerate(degree)
-            }
-            
             logger.info("Computed centrality metrics for all nodes")
             return metrics
-            
         except Exception as e:
             logger.error(f"Failed to compute centrality metrics: {e}")
             return {}
     
     @st.cache_data(ttl=3600)
     def detect_communities(_self, algorithm: str = 'louvain') -> Dict[str, Any]:
-        """Detect communities using various algorithms."""
+        """Detect communities using pre-computed data or algorithms."""
         try:
+            # Try to use pre-computed data first
+            if _self._community_cache is None:
+                _self._load_precomputed_data()
+            if _self._community_cache and algorithm == 'louvain':
+                logger.info("Using pre-computed community data")
+                return _self._community_cache
+            # Fallback to computation if needed
+            _self._ensure_initialized()
             if algorithm == 'louvain':
                 communities = _self._ig_graph.community_multilevel(weights='weight')
-            elif algorithm == 'leiden':
-                communities = _self._ig_graph.community_leiden(weights='weight')
-            elif algorithm == 'walktrap':
-                communities = _self._ig_graph.community_walktrap(weights='weight').as_clustering()
             else:
-                raise ValueError(f"Unknown algorithm: {algorithm}")
-            
+                raise ValueError(f"Algorithm {algorithm} not supported without pre-computation")
             # Convert to node-community mapping
             node_communities = {}
             community_info = []
-            
             for i, community in enumerate(communities):
                 community_nodes = [_self._reverse_mapping[node_idx] for node_idx in community]
                 community_info.append({
@@ -132,20 +153,16 @@ class HighPerformanceGraphAnalytics:
                     'size': len(community_nodes),
                     'modularity': communities.modularity
                 })
-                
                 for node in community_nodes:
                     node_communities[node] = i
-            
             result = {
                 'node_communities': node_communities,
                 'communities': community_info,
                 'modularity': communities.modularity,
                 'algorithm': algorithm
             }
-            
             logger.info(f"Detected {len(communities)} communities using {algorithm}")
             return result
-            
         except Exception as e:
             logger.error(f"Community detection failed: {e}")
             return {'node_communities': {}, 'communities': [], 'modularity': 0.0}
