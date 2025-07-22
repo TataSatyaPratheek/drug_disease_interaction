@@ -29,7 +29,7 @@ dependencies = [
     "pandas",
     "networkx",
     "torch",
-    "torch-geometric", 
+    "torch-geometric",
     "rdkit",
     "scikit-learn",
     "matplotlib",
@@ -51,7 +51,7 @@ dependencies = [
     "sentence-transformers",
     "streamlit",
     "plotly",
-    "weaviate"
+    "weaviate",
 ]
 
 [project.optional-dependencies]

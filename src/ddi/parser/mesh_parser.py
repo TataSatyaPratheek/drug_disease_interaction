@@ -9,31 +9,50 @@ import json
 
 class MeSHParser:
     """
-    Parser for MeSH disease taxonomy and hierarchical information, specifically targeting
-    the 2025 version files (desc2025.xml, qual2025.xml).
+    Parser for MeSH disease taxonomy and hierarchical information, supporting multiple years
+    (2020-2025) including descriptors, qualifiers, and supplementary records.
     """
 
     def __init__(self, mesh_dir: str, output_dir: str = None):
         """Initialize MeSH parser
 
         Args:
-            mesh_dir: Directory containing MeSH XML files (expected: desc2025.xml, qual2025.xml)
+            mesh_dir: Directory containing MeSH XML files (supports desc/qual/supp YYYY.xml format)
             output_dir: Directory to save processed data
         """
         self.mesh_dir = mesh_dir
-        self.output_dir = output_dir or "data/processed/diseases/mesh"
+        self.output_dir = output_dir or "data/processed/mesh"
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        # Data containers - Initialized/reset in parse_2025_mesh
+        # Data containers - Initialized/reset in parse_mesh
         self.descriptors = {}
         self.qualifiers = {}
+        self.supplementary = {}
         self.disease_hierarchy = {}
         self.term_to_id = {}
 
-        # Disease category prefixes
+        # Disease category prefixes (expanded for comprehensive coverage)
         self.disease_categories = {"C"}  # MeSH tree numbers starting with C are diseases
+        
+        # Available years (auto-detected from files)
+        self.available_years = self._detect_available_years()
+
+    def _detect_available_years(self) -> list:
+        """Detect available MeSH years from files in the directory"""
+        years = set()
+        if os.path.exists(self.mesh_dir):
+            for filename in os.listdir(self.mesh_dir):
+                if filename.endswith('.xml'):
+                    # Extract year from filename (e.g., desc2025.xml -> 2025)
+                    parts = filename.replace('.xml', '')
+                    if len(parts) >= 4 and parts[-4:].isdigit():
+                        years.add(int(parts[-4:]))
+        
+        available_years = sorted(list(years))
+        self.logger.info(f"Detected MeSH years: {available_years}")
+        return available_years
 
     def _parse_xml_robustly(self, file_path: str) -> Optional[ET.Element]:
         """Attempts to parse an XML file, trying standard ET and then lxml if available."""
@@ -265,64 +284,191 @@ class MeSHParser:
 
         self.logger.info(f"Finished processing qualifier file. Processed: {processed_count}, Skipped: {skipped_count}")
 
-
-    def parse_2025_mesh(self, limit: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """
-        Parse the specific MeSH 2025 descriptor and qualifier files.
+    def parse_supplementary_file(self, file_path: str) -> None:
+        """Parse MeSH supplementary XML file (suppYYYY.xml) and update internal state.
 
         Args:
-            limit: Limit number of descriptors to parse (for testing).
+            file_path: Path to supplementary XML file.
+        """
+        self.logger.info(f"Parsing supplementary file: {file_path}")
+        root = self._parse_xml_robustly(file_path)
+        if root is None:
+            self.logger.error(f"Failed to parse supplementary file: {file_path}")
+            return
+
+        # Extract supplementary records
+        supp_records = root.findall(".//SupplementalRecord")
+        self.logger.info(f"Found {len(supp_records)} supplementary records to process.")
+
+        processed_count = 0
+        skipped_count = 0
+        for record in tqdm(supp_records, desc="Processing supplementary records"):
+            try:
+                # Extract supplementary UI
+                supp_ui_elem = record.find("./SupplementalRecordUI")
+                if supp_ui_elem is None or not supp_ui_elem.text:
+                    skipped_count += 1
+                    continue
+                supp_id = supp_ui_elem.text
+
+                # Extract supplementary name
+                supp_name_elem = record.find("./SupplementalRecordName/String")
+                if supp_name_elem is None or not supp_name_elem.text:
+                    skipped_count += 1
+                    continue
+                supp_name = supp_name_elem.text
+
+                # Extract mapped descriptors (diseases that this supplementary maps to)
+                mapped_descriptors = []
+                heading_mapped_to_list = record.find("./HeadingMappedToList")
+                if heading_mapped_to_list is not None:
+                    for mapping in heading_mapped_to_list.findall("./HeadingMappedTo"):
+                        desc_ref = mapping.find("./DescriptorReferredTo/DescriptorUI")
+                        if desc_ref is not None and desc_ref.text:
+                            mapped_descriptors.append(desc_ref.text.strip())
+
+                # Extract pharmacological actions (for drug supplements)
+                pharm_actions = []
+                pharm_action_list = record.find("./PharmacologicalActionList")
+                if pharm_action_list is not None:
+                    for action in pharm_action_list.findall("./PharmacologicalAction"):
+                        action_ref = action.find("./DescriptorReferredTo/DescriptorUI")
+                        if action_ref is not None and action_ref.text:
+                            pharm_actions.append(action_ref.text.strip())
+
+                # Store supplementary data
+                self.supplementary[supp_id] = {
+                    "id": supp_id,
+                    "name": supp_name,
+                    "mapped_descriptors": mapped_descriptors,
+                    "pharmacological_actions": pharm_actions
+                }
+                processed_count += 1
+
+            except Exception as e:
+                self.logger.warning(f"Error processing supplementary record near UI {supp_id if 'supp_id' in locals() else 'unknown'}: {e}", exc_info=True)
+                skipped_count += 1
+                continue
+
+        self.logger.info(f"Finished processing supplementary file. Processed: {processed_count}, Skipped: {skipped_count}")
+
+    def parse_mesh(self, year: int = 2025, include_supplementary: bool = True, limit: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """
+        Parse MeSH data for a specific year including descriptors, qualifiers, and optionally supplementary records.
+
+        Args:
+            year: MeSH year to parse (default: 2025)
+            include_supplementary: Whether to include supplementary records
+            limit: Limit number of descriptors to parse (for testing)
 
         Returns:
-            Dictionary containing processed MeSH data, or None if parsing fails critically (e.g., missing desc file).
+            Dictionary containing processed MeSH data, or None if parsing fails critically.
         """
-        # Define expected filenames for 2025
-        desc_file_name = "desc2025.xml"
-        qual_file_name = "qual2025.xml"
+        if year not in self.available_years:
+            self.logger.error(f"Year {year} not available. Available years: {self.available_years}")
+            return None
+
+        # Define filenames for the specified year
+        desc_file_name = f"desc{year}.xml"
+        qual_file_name = f"qual{year}.xml"
+        supp_file_name = f"supp{year}.xml"
+        
         desc_path = os.path.join(self.mesh_dir, desc_file_name)
         qual_path = os.path.join(self.mesh_dir, qual_file_name)
+        supp_path = os.path.join(self.mesh_dir, supp_file_name)
 
         # Reset internal state for a fresh parse
         self.descriptors = {}
         self.qualifiers = {}
-        self.disease_hierarchy = {} # Will be populated with parent -> {children: [...]} structure initially
+        self.supplementary = {}
+        self.disease_hierarchy = {}
         self.term_to_id = {}
+
+        self.logger.info(f"Starting MeSH {year} parsing...")
 
         # --- Parse Descriptor File (Mandatory) ---
         if os.path.exists(desc_path):
-            self.logger.info(f"Using specific descriptor file: {desc_path}")
+            self.logger.info(f"Using descriptor file: {desc_path}")
             self.parse_descriptor_file(desc_path, limit=limit)
-            # Check if any descriptors were actually parsed (especially disease-related ones)
             if not self.descriptors:
-                 self.logger.warning(f"No disease-related descriptors found or parsed from {desc_path}. Result might be empty.")
-                 # Allow continuing, maybe only qualifiers are needed? Or return None?
-                 # Let's continue but the result will reflect the lack of descriptors.
+                self.logger.warning(f"No disease-related descriptors found or parsed from {desc_path}. Result might be empty.")
         else:
             self.logger.error(f"Required descriptor file not found: {desc_path}. Cannot proceed.")
-            return None # Critical failure
+            return None
 
         # --- Parse Qualifier File (Optional) ---
         if os.path.exists(qual_path):
-            self.logger.info(f"Using specific qualifier file: {qual_path}")
+            self.logger.info(f"Using qualifier file: {qual_path}")
             self.parse_qualifier_file(qual_path)
         else:
             self.logger.warning(f"Qualifier file not found: {qual_path}. Proceeding without qualifier data.")
 
+        # --- Parse Supplementary File (Optional) ---
+        if include_supplementary and os.path.exists(supp_path):
+            self.logger.info(f"Using supplementary file: {supp_path}")
+            self.parse_supplementary_file(supp_path)
+        elif include_supplementary:
+            self.logger.warning(f"Supplementary file not found: {supp_path}. Proceeding without supplementary data.")
+
         # --- Process Disease Hierarchy ---
-        # This step adds names and descriptor IDs to the hierarchy structure built during descriptor parsing
         self._process_disease_hierarchy()
 
         # --- Prepare Result ---
         result = {
             "descriptors": self.descriptors,
             "qualifiers": self.qualifiers,
-            "disease_hierarchy": self.disease_hierarchy, # Now contains processed nodes
+            "supplementary": self.supplementary,
+            "disease_hierarchy": self.disease_hierarchy,
             "term_to_id": self.term_to_id,
-            "version": "2025"  # Explicitly set version
+            "version": str(year),
+            "available_years": self.available_years
         }
 
-        self.logger.info(f"MeSH 2025 parsing complete. Found {len(self.descriptors)} disease descriptors, {len(self.qualifiers)} qualifiers.")
+        self.logger.info(f"MeSH {year} parsing complete. Found {len(self.descriptors)} disease descriptors, {len(self.qualifiers)} qualifiers, {len(self.supplementary)} supplementary records.")
         return result
+
+    def parse_multiple_years(self, years: Optional[list] = None, include_supplementary: bool = True) -> Dict[str, Any]:
+        """
+        Parse MeSH data for multiple years and combine the results.
+        
+        Args:
+            years: List of years to parse (default: all available years)
+            include_supplementary: Whether to include supplementary records
+            
+        Returns:
+            Combined dictionary with historical MeSH data
+        """
+        if years is None:
+            years = self.available_years
+            
+        combined_result = {
+            "descriptors_by_year": {},
+            "qualifiers_by_year": {},
+            "supplementary_by_year": {},
+            "term_to_id_by_year": {},
+            "latest_descriptors": {},
+            "latest_hierarchy": {},
+            "years_processed": []
+        }
+        
+        for year in sorted(years):
+            self.logger.info(f"Processing MeSH year {year}...")
+            year_result = self.parse_mesh(year, include_supplementary=include_supplementary)
+            
+            if year_result:
+                combined_result["descriptors_by_year"][year] = year_result["descriptors"]
+                combined_result["qualifiers_by_year"][year] = year_result["qualifiers"]
+                combined_result["supplementary_by_year"][year] = year_result["supplementary"]
+                combined_result["term_to_id_by_year"][year] = year_result["term_to_id"]
+                combined_result["years_processed"].append(year)
+                
+                # Keep the latest year as the primary reference
+                if year == max(years):
+                    combined_result["latest_descriptors"] = year_result["descriptors"]
+                    combined_result["latest_hierarchy"] = year_result["disease_hierarchy"]
+        
+        self.logger.info(f"Multi-year parsing complete. Processed years: {combined_result['years_processed']}")
+        return combined_result
 
     def _process_disease_hierarchy(self) -> None:
         """
@@ -552,10 +698,12 @@ class MeSHParser:
 def main():
     import argparse
 
-    parser_arg = argparse.ArgumentParser(description="Parse MeSH 2025 descriptor and qualifier files.") # Updated description
-    parser_arg.add_argument("--mesh_dir", required=True, help="Directory containing MeSH XML files (desc2025.xml, qual2025.xml)")
+    parser_arg = argparse.ArgumentParser(description="Parse MeSH descriptor, qualifier, and supplementary files for multiple years (2020-2025).")
+    parser_arg.add_argument("--mesh_dir", required=True, help="Directory containing MeSH XML files (descYYYY.xml, qualYYYY.xml, suppYYYY.xml)")
     parser_arg.add_argument("--output_dir", required=True, help="Output directory for processed data")
     parser_arg.add_argument("--format", choices=["pickle", "json"], default="pickle", help="Output format for saved files")
+    parser_arg.add_argument("--year", type=int, default=2025, help="MeSH year to parse (default: 2025)")
+    parser_arg.add_argument("--multi_year", action="store_true", help="Parse all available years")
     parser_arg.add_argument("--limit", type=int, help="Limit number of descriptors to parse (for testing)")
     args = parser_arg.parse_args()
 
@@ -569,23 +717,37 @@ def main():
     # Initialize parser
     mesh_parser = MeSHParser(args.mesh_dir, args.output_dir)
 
-    # Parse MeSH 2025 data
-    parsed_mesh_data = mesh_parser.parse_2025_mesh(limit=args.limit)
-
-    if parsed_mesh_data:
-        # Save main parsed data
-        saved_mesh_path = mesh_parser.save_mesh_data(parsed_mesh_data, format=args.format)
-
-        if saved_mesh_path:
-            # Extract and save disease taxonomy
-            taxonomy = mesh_parser.extract_disease_taxonomy() # Uses internal state populated by parse_2025_mesh
-            mesh_parser.save_disease_taxonomy(taxonomy, parsed_mesh_data['version'], format=args.format)
+    if args.multi_year:
+        # Parse all available years
+        logging.info("Multi-year parsing requested...")
+        parsed_mesh_data = mesh_parser.parse_multiple_years()
+        
+        if parsed_mesh_data and parsed_mesh_data["years_processed"]:
+            # Save combined data
+            combined_filename = f"mesh_data_combined_{min(parsed_mesh_data['years_processed'])}-{max(parsed_mesh_data['years_processed'])}"
+            parsed_mesh_data["version"] = combined_filename
+            saved_mesh_path = mesh_parser.save_mesh_data(parsed_mesh_data, format=args.format)
+            logging.info(f"Multi-year MeSH processing finished. Years: {parsed_mesh_data['years_processed']}")
         else:
-             logging.error("Failed to save main MeSH data, skipping taxonomy saving.")
-
-        logging.info("MeSH 2025 processing finished successfully.")
+            logging.error("Multi-year MeSH parsing failed.")
     else:
-        logging.error("MeSH 2025 parsing failed (likely missing desc2025.xml or critical parsing error). No data saved.")
+        # Parse specific year
+        parsed_mesh_data = mesh_parser.parse_mesh(year=args.year, include_supplementary=True, limit=args.limit)
+
+        if parsed_mesh_data:
+            # Save main parsed data
+            saved_mesh_path = mesh_parser.save_mesh_data(parsed_mesh_data, format=args.format)
+
+            if saved_mesh_path:
+                # Extract and save disease taxonomy
+                taxonomy = mesh_parser.extract_disease_taxonomy()
+                mesh_parser.save_disease_taxonomy(taxonomy, parsed_mesh_data['version'], format=args.format)
+            else:
+                 logging.error("Failed to save main MeSH data, skipping taxonomy saving.")
+
+            logging.info(f"MeSH {args.year} processing finished successfully.")
+        else:
+            logging.error(f"MeSH {args.year} parsing failed. No data saved.")
 
 if __name__ == "__main__":
     main()

@@ -3,9 +3,13 @@
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.12.13
-    # via torch-geometric
+    # via
+    #   llama-index-core
+    #   torch-geometric
 aiosignal==1.3.2
     # via aiohttp
+aiosqlite==0.21.0
+    # via llama-index-core
 altair==5.5.0
     # via streamlit
 annotated-types==0.7.0
@@ -13,12 +17,13 @@ annotated-types==0.7.0
 anyio==4.9.0
     # via
     #   httpx
+    #   openai
     #   starlette
     #   watchfiles
-appnope==0.1.4
-    # via ipykernel
 asttokens==3.0.0
     # via stack-data
+async-timeout==5.0.1
+    # via aiohttp
 attrs==25.3.0
     # via
     #   aiohttp
@@ -26,8 +31,12 @@ attrs==25.3.0
     #   referencing
 backoff==2.2.1
     # via posthog
+banks==2.2.0
+    # via llama-index-core
 bcrypt==4.3.0
     # via chromadb
+beautifulsoup4==4.13.4
+    # via llama-index-readers-file
 blinker==1.9.0
     # via streamlit
 build==1.2.2.post1
@@ -41,6 +50,7 @@ certifi==2025.6.15
     #   httpcore
     #   httpx
     #   kubernetes
+    #   llama-cloud
     #   requests
 charset-normalizer==3.4.2
     # via requests
@@ -48,9 +58,13 @@ chromadb==1.0.13
     # via drug-disease-interaction (pyproject.toml)
 click==8.2.1
     # via
+    #   llama-cloud-services
+    #   nltk
     #   streamlit
     #   typer
     #   uvicorn
+colorama==0.4.6
+    # via griffe
 coloredlogs==15.0.1
     # via onnxruntime
 comm==0.2.2
@@ -59,14 +73,29 @@ contourpy==1.3.2
     # via matplotlib
 cycler==0.12.1
     # via matplotlib
+dataclasses-json==0.6.7
+    # via llama-index-core
 debugpy==1.8.14
     # via ipykernel
 decorator==5.2.1
     # via ipython
+deprecated==1.2.18
+    # via
+    #   banks
+    #   llama-index-core
+    #   llama-index-instrumentation
+dirtyjson==1.0.8
+    # via llama-index-core
 distro==1.9.0
-    # via posthog
+    # via
+    #   openai
+    #   posthog
 durationpy==0.10
     # via kubernetes
+exceptiongroup==1.3.0
+    # via
+    #   anyio
+    #   ipython
 executing==2.2.0
     # via stack-data
 fastapi==0.115.14
@@ -76,6 +105,8 @@ filelock==3.18.0
     #   huggingface-hub
     #   torch
     #   transformers
+filetype==1.2.0
+    # via llama-index-core
 flatbuffers==25.2.10
     # via onnxruntime
 fonttools==4.58.4
@@ -87,6 +118,7 @@ frozenlist==1.7.0
 fsspec==2025.5.1
     # via
     #   huggingface-hub
+    #   llama-index-core
     #   torch
     #   torch-geometric
 gitdb==4.0.12
@@ -97,6 +129,10 @@ google-auth==2.40.3
     # via kubernetes
 googleapis-common-protos==1.70.0
     # via opentelemetry-exporter-otlp-proto-grpc
+greenlet==3.2.3
+    # via sqlalchemy
+griffe==1.7.3
+    # via banks
 grpcio==1.73.1
     # via
     #   chromadb
@@ -114,7 +150,10 @@ httptools==0.6.4
 httpx==0.28.1
     # via
     #   chromadb
+    #   llama-cloud
+    #   llama-index-core
     #   ollama
+    #   openai
 huggingface-hub==0.33.1
     # via
     #   sentence-transformers
@@ -134,20 +173,25 @@ importlib-resources==6.5.2
     # via chromadb
 ipykernel==6.29.5
     # via drug-disease-interaction (pyproject.toml)
-ipython==9.3.0
+ipython==8.37.0
     # via ipykernel
-ipython-pygments-lexers==1.1.1
-    # via ipython
+isodate==0.7.2
+    # via rdflib
 jedi==0.19.2
     # via ipython
 jinja2==3.1.6
     # via
     #   altair
+    #   banks
     #   pydeck
     #   torch
     #   torch-geometric
+jiter==0.10.0
+    # via openai
 joblib==1.5.1
-    # via scikit-learn
+    # via
+    #   nltk
+    #   scikit-learn
 jsonschema==4.24.0
     # via
     #   altair
@@ -164,10 +208,72 @@ kiwisolver==1.4.8
     # via matplotlib
 kubernetes==33.1.0
     # via chromadb
+llama-cloud==0.1.32
+    # via
+    #   llama-cloud-services
+    #   llama-index-indices-managed-llama-cloud
+llama-cloud-services==0.6.43
+    # via llama-parse
+llama-index==0.12.50
+    # via drug-disease-interaction (pyproject.toml)
+llama-index-agent-openai==0.4.12
+    # via
+    #   llama-index
+    #   llama-index-program-openai
+llama-index-cli==0.4.4
+    # via llama-index
+llama-index-core==0.12.51
+    # via
+    #   llama-cloud-services
+    #   llama-index
+    #   llama-index-agent-openai
+    #   llama-index-cli
+    #   llama-index-embeddings-openai
+    #   llama-index-indices-managed-llama-cloud
+    #   llama-index-llms-openai
+    #   llama-index-multi-modal-llms-openai
+    #   llama-index-program-openai
+    #   llama-index-question-gen-openai
+    #   llama-index-readers-file
+    #   llama-index-readers-llama-parse
+llama-index-embeddings-openai==0.3.1
+    # via
+    #   llama-index
+    #   llama-index-cli
+llama-index-indices-managed-llama-cloud==0.7.10
+    # via llama-index
+llama-index-instrumentation==0.3.0
+    # via llama-index-workflows
+llama-index-llms-openai==0.4.7
+    # via
+    #   llama-index
+    #   llama-index-agent-openai
+    #   llama-index-cli
+    #   llama-index-multi-modal-llms-openai
+    #   llama-index-program-openai
+    #   llama-index-question-gen-openai
+llama-index-multi-modal-llms-openai==0.5.3
+    # via llama-index
+llama-index-program-openai==0.3.2
+    # via
+    #   llama-index
+    #   llama-index-question-gen-openai
+llama-index-question-gen-openai==0.3.1
+    # via llama-index
+llama-index-readers-file==0.4.8
+    # via llama-index
+llama-index-readers-llama-parse==0.4.0
+    # via llama-index
+llama-index-workflows==1.1.0
+    # via llama-index-core
+llama-parse==0.6.43
+    # via llama-index-readers-llama-parse
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
     # via jinja2
+marshmallow==3.26.1
+    # via dataclasses-json
 matplotlib==3.10.3
     # via
     #   drug-disease-interaction (pyproject.toml)
@@ -186,22 +292,33 @@ multidict==6.6.0
     # via
     #   aiohttp
     #   yarl
+mypy-extensions==1.1.0
+    # via typing-inspect
 narwhals==1.44.0
     # via
     #   altair
     #   plotly
 nest-asyncio==1.6.0
-    # via ipykernel
-networkx==3.5
+    # via
+    #   ipykernel
+    #   llama-index-core
+networkx==3.4.2
     # via
     #   drug-disease-interaction (pyproject.toml)
+    #   llama-index-core
     #   python-louvain
+    #   streamlit-agraph
     #   torch
-numpy==2.3.1
+nltk==3.9.1
+    # via
+    #   llama-index
+    #   llama-index-core
+numpy==2.2.6
     # via
     #   drug-disease-interaction (pyproject.toml)
     #   chromadb
     #   contourpy
+    #   llama-index-core
     #   matplotlib
     #   onnxruntime
     #   pandas
@@ -215,6 +332,43 @@ numpy==2.3.1
     #   torch-geometric
     #   transformers
     #   uniprot-id-mapper
+nvidia-cublas-cu12==12.6.4.1
+    # via
+    #   nvidia-cudnn-cu12
+    #   nvidia-cusolver-cu12
+    #   torch
+nvidia-cuda-cupti-cu12==12.6.80
+    # via torch
+nvidia-cuda-nvrtc-cu12==12.6.77
+    # via torch
+nvidia-cuda-runtime-cu12==12.6.77
+    # via torch
+nvidia-cudnn-cu12==9.5.1.17
+    # via torch
+nvidia-cufft-cu12==11.3.0.4
+    # via torch
+nvidia-cufile-cu12==1.11.1.6
+    # via torch
+nvidia-curand-cu12==10.3.7.77
+    # via torch
+nvidia-cusolver-cu12==11.7.1.2
+    # via torch
+nvidia-cusparse-cu12==12.5.4.2
+    # via
+    #   nvidia-cusolver-cu12
+    #   torch
+nvidia-cusparselt-cu12==0.6.3
+    # via torch
+nvidia-nccl-cu12==2.26.2
+    # via torch
+nvidia-nvjitlink-cu12==12.6.85
+    # via
+    #   nvidia-cufft-cu12
+    #   nvidia-cusolver-cu12
+    #   nvidia-cusparse-cu12
+    #   torch
+nvidia-nvtx-cu12==12.6.77
+    # via torch
 oauthlib==3.3.1
     # via
     #   kubernetes
@@ -223,6 +377,11 @@ ollama==0.5.1
     # via drug-disease-interaction (pyproject.toml)
 onnxruntime==1.22.0
     # via chromadb
+openai==1.97.0
+    # via
+    #   llama-index-agent-openai
+    #   llama-index-embeddings-openai
+    #   llama-index-llms-openai
 opentelemetry-api==1.34.1
     # via
     #   chromadb
@@ -253,6 +412,7 @@ packaging==25.0
     #   build
     #   huggingface-hub
     #   ipykernel
+    #   marshmallow
     #   matplotlib
     #   onnxruntime
     #   plotly
@@ -261,6 +421,7 @@ packaging==25.0
 pandas==2.3.0
     # via
     #   drug-disease-interaction (pyproject.toml)
+    #   llama-index-readers-file
     #   seaborn
     #   streamlit
     #   uniprot-id-mapper
@@ -270,12 +431,17 @@ pexpect==4.9.0
     # via ipython
 pillow==11.2.1
     # via
+    #   llama-index-core
     #   matplotlib
     #   rdkit
     #   sentence-transformers
     #   streamlit
 platformdirs==4.3.8
-    # via jupyter-core
+    # via
+    #   banks
+    #   jupyter-core
+    #   llama-cloud-services
+    #   llama-index-core
 plotly==6.2.0
     # via drug-disease-interaction (pyproject.toml)
 posthog==6.0.0
@@ -312,9 +478,16 @@ pybase64==1.4.1
     # via chromadb
 pydantic==2.11.7
     # via
+    #   banks
     #   chromadb
     #   fastapi
+    #   llama-cloud
+    #   llama-cloud-services
+    #   llama-index-core
+    #   llama-index-instrumentation
+    #   llama-index-workflows
     #   ollama
+    #   openai
 pydantic-core==2.33.2
     # via pydantic
 pydeck==0.9.1
@@ -322,12 +495,14 @@ pydeck==0.9.1
 pygments==2.19.2
     # via
     #   ipython
-    #   ipython-pygments-lexers
     #   rich
 pyparsing==3.2.3
     # via
     #   matplotlib
+    #   rdflib
     #   torch-geometric
+pypdf==5.8.0
+    # via llama-index-readers-file
 pypika==0.48.9
     # via chromadb
 pyproject-hooks==1.2.0
@@ -342,6 +517,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
     # via
     #   drug-disease-interaction (pyproject.toml)
+    #   llama-cloud-services
     #   uvicorn
 python-louvain==0.16
     # via drug-disease-interaction (pyproject.toml)
@@ -354,12 +530,15 @@ pyyaml==6.0.2
     #   chromadb
     #   huggingface-hub
     #   kubernetes
+    #   llama-index-core
     #   transformers
     #   uvicorn
 pyzmq==27.0.0
     # via
     #   ipykernel
     #   jupyter-client
+rdflib==7.1.4
+    # via streamlit-agraph
 rdkit==2025.3.3
     # via drug-disease-interaction (pyproject.toml)
 referencing==0.36.2
@@ -367,16 +546,21 @@ referencing==0.36.2
     #   jsonschema
     #   jsonschema-specifications
 regex==2024.11.6
-    # via transformers
+    # via
+    #   nltk
+    #   tiktoken
+    #   transformers
 requests==2.32.4
     # via
     #   drug-disease-interaction (pyproject.toml)
     #   huggingface-hub
     #   kubernetes
+    #   llama-index-core
     #   posthog
     #   pytrials
     #   requests-oauthlib
     #   streamlit
+    #   tiktoken
     #   torch-geometric
     #   transformers
     #   uniprot-id-mapper
@@ -399,7 +583,7 @@ scikit-learn==1.7.0
     # via
     #   drug-disease-interaction (pyproject.toml)
     #   sentence-transformers
-scipy==1.16.0
+scipy==1.15.3
     # via
     #   drug-disease-interaction (pyproject.toml)
     #   scikit-learn
@@ -409,7 +593,9 @@ seaborn==0.13.2
 sentence-transformers==4.1.0
     # via drug-disease-interaction (pyproject.toml)
 setuptools==80.9.0
-    # via torch
+    # via
+    #   llama-index-core
+    #   triton
 shellingham==1.5.4
     # via typer
 six==1.17.0
@@ -420,29 +606,48 @@ six==1.17.0
 smmap==5.0.2
     # via gitdb
 sniffio==1.3.1
-    # via anyio
+    # via
+    #   anyio
+    #   openai
+soupsieve==2.7
+    # via beautifulsoup4
+sqlalchemy==2.0.41
+    # via llama-index-core
 stack-data==0.6.3
     # via ipython
 starlette==0.46.2
     # via fastapi
 streamlit==1.46.1
+    # via
+    #   drug-disease-interaction (pyproject.toml)
+    #   streamlit-agraph
+streamlit-agraph==0.0.45
     # via drug-disease-interaction (pyproject.toml)
+striprtf==0.0.26
+    # via llama-index-readers-file
 sympy==1.14.0
     # via
     #   onnxruntime
     #   torch
 tenacity==9.1.2
     # via
+    #   drug-disease-interaction (pyproject.toml)
     #   chromadb
+    #   llama-cloud-services
+    #   llama-index-core
     #   streamlit
 threadpoolctl==3.6.0
     # via scikit-learn
+tiktoken==0.9.0
+    # via llama-index-core
 tokenizers==0.21.2
     # via
     #   chromadb
     #   transformers
 toml==0.10.2
     # via streamlit
+tomli==2.2.1
+    # via build
 torch==2.7.1
     # via
     #   drug-disease-interaction (pyproject.toml)
@@ -459,6 +664,9 @@ tqdm==4.67.1
     #   drug-disease-interaction (pyproject.toml)
     #   chromadb
     #   huggingface-hub
+    #   llama-index-core
+    #   nltk
+    #   openai
     #   sentence-transformers
     #   torch-geometric
     #   transformers
@@ -473,17 +681,26 @@ traitlets==5.14.3
     #   matplotlib-inline
 transformers==4.53.0
     # via sentence-transformers
+triton==3.3.1
+    # via torch
 typer==0.16.0
     # via
     #   drug-disease-interaction (pyproject.toml)
     #   chromadb
 typing-extensions==4.14.0
     # via
+    #   aiosqlite
     #   altair
     #   anyio
+    #   beautifulsoup4
     #   chromadb
+    #   exceptiongroup
     #   fastapi
     #   huggingface-hub
+    #   ipython
+    #   llama-index-core
+    #   multidict
+    #   openai
     #   opentelemetry-api
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-sdk
@@ -491,12 +708,21 @@ typing-extensions==4.14.0
     #   posthog
     #   pydantic
     #   pydantic-core
+    #   pypdf
     #   referencing
+    #   rich
     #   sentence-transformers
+    #   sqlalchemy
     #   streamlit
     #   torch
     #   typer
+    #   typing-inspect
     #   typing-inspection
+    #   uvicorn
+typing-inspect==0.9.0
+    # via
+    #   dataclasses-json
+    #   llama-index-core
 typing-inspection==0.4.1
     # via pydantic
 tzdata==2025.2
@@ -513,6 +739,8 @@ uvicorn==0.34.3
     #   chromadb
 uvloop==0.21.0
     # via uvicorn
+watchdog==6.0.0
+    # via streamlit
 watchfiles==1.1.0
     # via uvicorn
 wcwidth==0.2.13
@@ -523,6 +751,10 @@ websocket-client==1.8.0
     # via kubernetes
 websockets==15.0.1
     # via uvicorn
+wrapt==1.17.2
+    # via
+    #   deprecated
+    #   llama-index-core
 yarl==1.20.1
     # via aiohttp
 zipp==3.23.0
