@@ -17,6 +17,9 @@ classifiers = [
 ]
 
 dependencies = [
+    "llama-index",
+    "streamlit-agraph",
+    "tenacity",
     "streamlit",
     "pandas",
     "plotly",

@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MeSH QualifierRecordSet",
+  "type": "object",
+  "properties": {
+    "QualifierRecordSet": {
+      "type": "object",
+      "properties": {
+        "QualifierRecord": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "QualifierUI": { "type": "string" },
+              "QualifierName": {
+                "type": "object",
+                "properties": { "String": { "type": "string" } }
+              },
+              "Abbreviation": { "type": "string" },
+              "DateCreated": {
+                "type": "object",
+                "properties": { "Year": { "type": "string" }, "Month": { "type": "string" }, "Day": { "type": "string" } }
+              },
+              "DateRevised": {
+                "type": "object",
+                "properties": { "Year": { "type": "string" }, "Month": { "type": "string" }, "Day": { "type": "string" } }
+              },
+              "DateEstablished": {
+                "type": "object",
+                "properties": { "Year": { "type": "string" }, "Month": { "type": "string" }, "Day": { "type": "string" } }
+              },
+              "Annotation": { "type": "string" },
+              "HistoryNote": { "type": "string" },
+              "ConceptList": {
+                "type": "object",
+                "properties": {
+                  "Concept": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "@PreferredConceptYN": { "type": "string", "enum": ["Y", "N"] },
+                        "ConceptUI": { "type": "string" },
+                        "ConceptName": {
+                          "type": "object",
+                          "properties": { "String": { "type": "string" } }
+                        },
+                        "ScopeNote": { "type": "string" },
+                        "TermList": {
+                          "type": "object",
+                          "properties": {
+                            "Term": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "@ConceptPreferredTermYN": { "type": "string", "enum": ["Y", "N"] },
+                                  "@IsPermutedTermYN": { "type": "string", "enum": ["Y", "N"] },
+                                  "@LexicalTag": { "type": "string" },
+                                  "@RecordPreferredTermYN": { "type": "string", "enum": ["Y", "N"] },
+                                  "TermUI": { "type": "string" },
+                                  "String": { "type": "string" }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["QualifierRecordSet"]
+}

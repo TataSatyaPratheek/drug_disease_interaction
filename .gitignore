@@ -24,10 +24,12 @@ wheels/
 MANIFEST
 
 # Project specific
+._*
 data/raw/
 data/processed/
 data/external/
 data/graph/
+data/weaviate_db/
 outputs/
 tests/test_data/
 tests/test_output/
@@ -47,6 +49,7 @@ ENV/
 .vscode/
 *.swp
 *.swo
+.DS_Store
 
 # Logs
 *.log

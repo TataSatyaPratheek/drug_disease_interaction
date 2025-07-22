@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DrugBank Export",
+  "type": "object",
+  "properties": {
+    "drugbank": {
+      "type": "object",
+      "properties": {
+        "@version": { "type": "string" },
+        "@exported-on": { "type": "string", "format": "date" },
+        "drug": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "@type": { "type": "string", "enum": ["small molecule", "biotech"] },
+              "@created": { "type": "string", "format": "date" },
+              "@updated": { "type": "string", "format": "date" },
+              "drugbank-id": { "type": "array", "items": { "type": "string" } },
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "cas-number": { "type": "string" },
+              "unii": { "type": "string" },
+              "average-mass": { "type": "number" },
+              "monoisotopic-mass": { "type": "number" },
+              "state": { "type": "string", "enum": ["solid", "liquid", "gas"] },
+              "groups": { "type": "array", "items": { "type": "string" } },
+              "general-references": { "type": "object" },
+              "synthesis-reference": { "type": "string" },
+              "indication": { "type": "string" },
+              "pharmacodynamics": { "type": "string" },
+              "mechanism-of-action": { "type": "string" },
+              "toxicity": { "type": "string" },
+              "metabolism": { "type": "string" },
+              "absorption": { "type": "string" },
+              "half-life": { "type": "string" },
+              "protein-binding": { "type": "string" },
+              "route-of-elimination": { "type": "string" },
+              "volume-of-distribution": { "type": "string" },
+              "clearance": { "type": "string" },
+              "classification": { "type": "object" },
+              "salts": { "type": "array", "items": { "type": "object" } },
+              "synonyms": { "type": "array", "items": { "type": "string" } },
+              "products": { "type": "array", "items": { "type": "object" } },
+              "international-brands": { "type": "array", "items": { "type": "object" } },
+              "mixtures": { "type": "array", "items": { "type": "object" } },
+              "packagers": { "type": "array", "items": { "type": "object" } },
+              "manufacturers": { "type": "array", "items": { "type": "object" } },
+              "prices": { "type": "array", "items": { "type": "object" } },
+              "categories": { "type": "array", "items": { "type": "object" } },
+              "affected-organisms": { "type": "array", "items": { "type": "string" } },
+              "dosages": { "type": "array", "items": { "type": "object" } },
+              "atc-codes": { "type": "array", "items": { "type": "object" } },
+              "ahfs-codes": { "type": "array", "items": { "type": "string" } },
+              "pdb-entries": { "type": "array", "items": { "type": "string" } },
+              "fda-label": { "type": "string" },
+              "msds": { "type": "string" },
+              "patents": { "type": "array", "items": { "type": "object" } },
+              "food-interactions": { "type": "array", "items": { "type": "string" } },
+              "drug-interactions": { "type": "array", "items": { "type": "object" } },
+              "sequences": { "type": "array", "items": { "type": "object" } },
+              "calculated-properties": { "type": "array", "items": { "type": "object" } },
+              "experimental-properties": { "type": "array", "items": { "type": "object" } },
+              "external-identifiers": { "type": "array", "items": { "type": "object" } },
+              "external-links": { "type": "array", "items": { "type": "object" } },
+              "pathways": { "type": "array", "items": { "type": "object" } },
+              "reactions": { "type": "array", "items": { "type": "object" } },
+              "snp-effects": { "type": "array", "items": { "type": "object" } },
+              "snp-adverse-drug-reactions": { "type": "array", "items": { "type": "object" } },
+              "targets": { "type": "array", "items": { "type": "object" } },
+              "enzymes": { "type": "array", "items": { "type": "object" } },
+              "carriers": { "type": "array", "items": { "type": "object" } },
+              "transporters": { "type": "array", "items": { "type": "object" } }
+            },
+            "required": [
+              "@type", "@created", "@updated", "drugbank-id", "name", "description", "cas-number",
+              "unii", "groups", "general-references"
+            ]
+          }
+        }
+      },
+      "required": ["@version", "@exported-on", "drug"]
+    }
+  },
+  "required": ["drugbank"]
+}

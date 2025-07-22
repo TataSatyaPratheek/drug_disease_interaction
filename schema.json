@@ -1,0 +1,2961 @@
+{
+  "association_by_datasource_direct": {
+    "datatypeId": {
+      "type": "string",
+      "description": "Identifier for the data type used to calculate the association score (e.g. genetic_association)"
+    },
+    "datasourceId": {
+      "type": "string",
+      "description": "Identifier for the data source used to calculate the association score. (e.g. chembl)"
+    },
+    "diseaseId": {
+      "type": "string",
+      "description": "Identifier for the disease in the association."
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Identifier for the target in the association."
+    },
+    "score": {
+      "type": "number",
+      "description": "Association score calculated independently for each data source without ontology propagation of evidence"
+    },
+    "evidenceCount": {
+      "type": "number",
+      "description": "Number of evidence items supporting the association."
+    }
+  },
+  "association_by_datatype_direct": {
+    "diseaseId": {
+      "type": "string",
+      "description": "Identifier for the disease in the association."
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Identifier for the target in the association."
+    },
+    "datatypeId": {
+      "type": "string",
+      "description": "Identifier for the data type used to calculate the association score."
+    },
+    "score": {
+      "type": "number",
+      "description": "Association score calculated independently for each data type without additional ontology propagation."
+    },
+    "evidenceCount": {
+      "type": "number",
+      "description": "Number of evidence items supporting the association."
+    }
+  },
+  "association_by_overall_direct": {
+    "diseaseId": {
+      "type": "string",
+      "description": "Identifier for the disease in the association."
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Identifier for the target in the association."
+    },
+    "score": {
+      "type": "number",
+      "description": "Association score calculated across all data sources without ontology propagation of evidence"
+    },
+    "evidenceCount": {
+      "type": "number",
+      "description": "Number of evidence items supporting the association."
+    }
+  },
+  "association_by_datasource_indirect": {
+    "datatypeId": {
+      "type": "string",
+      "description": "Identifier for the data type used to calculate the association score (e.g. genetic_association)"
+    },
+    "datasourceId": {
+      "type": "string",
+      "description": "Identifier for the data source used to calculate the association score. (e.g. chembl)"
+    },
+    "diseaseId": {
+      "type": "string",
+      "description": "Identifier for the disease in the association."
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Identifier for the target in the association."
+    },
+    "score": {
+      "type": "number",
+      "description": "Association score calculated independently for each data source considering ontology propagation of evidence"
+    },
+    "evidenceCount": {
+      "type": "number",
+      "description": "Number of evidence items supporting the association."
+    }
+  },
+  "association_by_datatype_indirect": {
+    "diseaseId": {
+      "type": "string",
+      "description": "Identifier for the disease in the association."
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Identifier for the target in the association."
+    },
+    "datatypeId": {
+      "type": "string",
+      "description": "Identifier for the data type used to calculate the association score."
+    },
+    "score": {
+      "type": "number",
+      "description": "Association score calculated independently for each data type, considering ontology propagation of evidence"
+    },
+    "evidenceCount": {
+      "type": "number",
+      "description": "Number of evidence items supporting the association."
+    }
+  },
+  "association_by_overall_indirect": {
+    "diseaseId": {
+      "type": "string",
+      "description": "Identifier for the disease in the association."
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Identifier for the target in the association."
+    },
+    "score": {
+      "type": "number",
+      "description": "Association score calculated across all data sources considering ontology propagation of evidence"
+    },
+    "evidenceCount": {
+      "type": "number",
+      "description": "Number of evidence items supporting the association."
+    }
+  },
+  "expression": {
+    "id": {
+      "type": "string",
+      "description": "Ensembl human gene identifier for the expressed gene [bioregistry:ensembl]"
+    },
+    "tissues": {
+      "type": "array",
+      "description": "Array of structs containing expression data relevant to a particular gene",
+      "items": {
+        "type": "object",
+        "properties": {
+          "efo_code": {
+            "type": "string",
+            "description": "Ontology ID of the biosample the expression data is from [bioregistry:uberon]"
+          },
+          "label": {
+            "type": "string",
+            "description": "Name of the biosample the expression data is from"
+          },
+          "organs": {
+            "type": "array",
+            "description": "List of organs that the biosample can be found in",
+            "items": { "type": "string" }
+          },
+          "anatomical_systems": {
+            "type": "array",
+            "description": "List of anatomical systems that the biosample can be found in",
+            "items": { "type": "string" }
+          },
+          "rna": {
+            "type": "object",
+            "description": "Struct containing relevant RNA expression values for a particular biosample and gene combination",
+            "properties": {
+              "value": {
+                "type": "number",
+                "description": "Expression value"
+              },
+              "zscore": {
+                "type": "integer",
+                "description": "Expression zscore"
+              },
+              "level": {
+                "type": "integer",
+                "description": "Level of RNA expression normalised to 0-5 or -1 if absent"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Unit for the RNA expression"
+              }
+            }
+          },
+          "protein": {
+            "type": "object",
+            "description": "Struct containing relevant protein expression values for a particular biosample and gene combination",
+            "properties": {
+              "reliability": {
+                "type": "boolean",
+                "description": "PLACEHOLDER for reliability description"
+              },
+              "level": {
+                "type": "integer",
+                "description": "Level of protein expression normalised to 0-5 or -1 if absent"
+              },
+              "cell_type": {
+                "type": "array",
+                "description": "List of cell types were protein levels were measured",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Cell type name"
+                    },
+                    "reliability": {
+                      "type": "boolean",
+                      "description": "PLACEHOLDER for reliability description"
+                    },
+                    "level": {
+                      "type": "integer",
+                      "description": "PLACEHOLDER for level description"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "biosample": {
+    "biosampleId": {
+      "type": "string",
+      "description": "Unique identifier for the biosample [bioregistry:uberon]"
+    },
+    "biosampleName": {
+      "type": "string",
+      "description": "Name of the biosample"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the biosample"
+    },
+    "xrefs": {
+      "type": "array",
+      "description": "Cross-reference IDs from other ontologies",
+      "items": { "type": "string" }
+    },
+    "synonyms": {
+      "type": "array",
+      "description": "List of synonymous names for the term",
+      "items": { "type": "string" }
+    },
+    "parents": {
+      "type": "array",
+      "description": "Direct parent biosample IDs in the ontology",
+      "items": { "type": "string" }
+    },
+    "ancestors": {
+      "type": "array",
+      "description": "List of ancestor biosample IDs in the ontology",
+      "items": { "type": "string" }
+    },
+    "children": {
+      "type": "array",
+      "description": "Direct child biosample IDs in the ontology",
+      "items": { "type": "string" }
+    },
+    "descendants": {
+      "type": "array",
+      "description": "List of descendant biosample IDs in the ontology",
+      "items": { "type": "string" }
+    }
+  },
+  "colocalisation": {
+    "leftStudyLocusId": {
+      "type": "string",
+      "description": "Study-locus identifier for left-side overlapping signal"
+    },
+    "rightStudyLocusId": {
+      "type": "string",
+      "description": "Study-locus identifier for right-side overlapping signal"
+    },
+    "chromosome": {
+      "type": "string",
+      "description": "Chromosome where the colocalisation occurs."
+    },
+    "rightStudyType": {
+      "type": "string",
+      "description": "Type of the right-side study (e.g., gwas, eqtl)."
+    },
+    "numberColocalisingVariants": {
+      "type": "number",
+      "description": "Number of variants intersecting between two overlapping study-loci"
+    },
+    "h0": {
+      "type": "number",
+      "description": "Posterior probability that neither trait is associated with the region (H0)."
+    },
+    "h1": {
+      "type": "number",
+      "description": "Posterior probability that only the left study trait is associated (H1)."
+    },
+    "h2": {
+      "type": "number",
+      "description": "Posterior probability that only the right study trait is associated (H2)."
+    },
+    "h3": {
+      "type": "number",
+      "description": "Posterior probability that both traits are associated, but with different causal variants (H3)."
+    },
+    "h4": {
+      "type": "number",
+      "description": "Posterior probability that both traits are associated and share a causal variant (H4)."
+    },
+    "colocalisationMethod": {
+      "type": "string",
+      "description": "Method used to estimate colocalisation (e.g., coloc)."
+    },
+    "betaRatioSignAverage": {
+      "type": "number",
+      "description": "Average sign of the beta ratio between colocalised variants."
+    }
+  },
+  "colocalisation_ecaviar": {
+    "leftStudyLocusId": {
+      "type": "string",
+      "description": "Study-locus identifier for left-side overlapping signal"
+    },
+    "rightStudyLocusId": {
+      "type": "string",
+      "description": "Study-locus identifier for right-side overlapping signal"
+    },
+    "chromosome": {
+      "type": "string",
+      "description": "Chromosome where the colocalisation occurs."
+    },
+    "rightStudyType": {
+      "type": "string",
+      "description": "Type of the right-side study (e.g., gwas, eqtl)."
+    },
+    "numberColocalisingVariants": {
+      "type": "number",
+      "description": "Number of variants intersecting between two overlapping study-loci"
+    },
+    "clpp": {
+      "type": "number",
+      "description": "Colocalisation posterior probability (CLPP) score estimating the probability of shared causal variants."
+    },
+    "colocalisationMethod": {
+      "type": "string",
+      "description": "Method used to estimate colocalisation (e.g., eCAVIAR)."
+    },
+    "betaRatioSignAverage": {
+      "type": "number",
+      "description": "Average sign of the beta ratio between colocalised variants."
+    }
+  },
+  "credible_set": {
+    "studyLocusId": {
+      "type": "string",
+      "description": "Study-locus identifier for the credible set."
+    },
+    "studyId": {
+      "type": "string",
+      "description": "Identifier for the study which the credible set is derived."
+    },
+    "variantId": {
+      "type": "string",
+      "description": "The lead variant for the credible set, by posterior probability."
+    },
+    "chromosome": {
+      "type": "string",
+      "description": "Chromosome which the credible set is located."
+    },
+    "position": {
+      "type": "integer",
+      "description": "Position of the lead variant for the credible set (GRCh38)."
+    },
+    "region": {
+      "type": "string",
+      "description": "Start and end positions of the region used for fine-mapping."
+    },
+    "beta": {
+      "type": "number",
+      "description": "Beta coefficient of the lead variant."
+    },
+    "zScore": {
+      "type": "number",
+      "description": "Z-score of the lead variant from the GWAS."
+    },
+    "pValueMantissa": {
+      "type": "number",
+      "description": "Mantissa value of the lead variant P-value."
+    },
+    "pValueExponent": {
+      "type": "integer",
+      "description": "Exponent value of the lead variant P-value."
+    },
+    "effectAlleleFrequencyFromSource": {
+      "type": "number",
+      "description": "Allele frequency of the lead variant from the GWAS."
+    },
+    "standardError": {
+      "type": "number",
+      "description": "Standard error of the lead variant."
+    },
+    "subStudyDescription": {
+      "type": "string",
+      "description": "[Deprecated]"
+    },
+    "qualityControls": {
+      "type": "array",
+      "description": "Quality control flags for this credible set.",
+      "items": { "type": "string" }
+    },
+    "finemappingMethod": {
+      "type": "string",
+      "description": "Method used for fine-mapping of credible set."
+    },
+    "credibleSetIndex": {
+      "type": "integer",
+      "description": "Integer label for the order of credible sets from study-region."
+    },
+    "credibleSetlog10BF": {
+      "type": "number",
+      "description": "Log10 Bayes factor for the entire credible set."
+    },
+    "purityMeanR2": {
+      "type": "number",
+      "description": "Mean R-squared linkage disequilibrium for variants in the credible set."
+    },
+    "purityMinR2": {
+      "type": "number",
+      "description": "Minimum R-squared linkage disequilibrium for variants in the credible set."
+    },
+    "locusStart": {
+      "type": "integer",
+      "description": "Start position of the region that was fine-mapped for this credible set."
+    },
+    "locusEnd": {
+      "type": "integer",
+      "description": "End position of the regino that was fine-mapped for this credible set."
+    },
+    "sampleSize": {
+      "type": "integer",
+      "description": "Sample size of the study which this credible set is derived."
+    },
+    "ldSet": {
+      "type": "array",
+      "description": "Array of structs which denote the variants in LD with the credible set lead variant.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tagVariantId": {
+            "type": "string",
+            "description": "The variant ID for tag variants in LD with the credible set lead variant."
+          },
+          "r2Overall": {
+            "type": "number",
+            "description": "The R-squared value for the tag variants with the credible set lead variant."
+          }
+        }
+      }
+    },
+    "locus": {
+      "type": "array",
+      "description": "Array of structs which denote the variants within the credible set.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "is95CredibleSet": {
+            "type": "boolean",
+            "description": "Boolean for if the variant is part of the 95% credible set."
+          },
+          "is99CredibleSet": {
+            "type": "boolean",
+            "description": "Boolean for if the variant is part of the 99% credible set."
+          },
+          "logBF": {
+            "type": "number",
+            "description": "Log (natural) Bayes factor for the variant from fine-mapping."
+          },
+          "posteriorProbability": {
+            "type": "number",
+            "description": "Posterior inclusion probability for the variant within this credible set."
+          },
+          "variantId": {
+            "type": "string",
+            "description": "Variant ID for this variant in the credible set."
+          },
+          "pValueMantissa": {
+            "type": "number",
+            "description": "Mantissa of the P-value for this variant in the credible set."
+          },
+          "pValueExponent": {
+            "type": "integer",
+            "description": "Exponent of the P-value for this variant in the credible set."
+          },
+          "beta": {
+            "type": "number",
+            "description": "Beta coefficient of this variant in the credible set."
+          },
+          "standardError": {
+            "type": "number",
+            "description": "Standard error of this variant in the credible set."
+          },
+          "r2Overall": {
+            "type": "number",
+            "description": "R-squared (LD) between this credible set variant and the lead variant."
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Description of how this credible set was derived in terms of data and fine-mapping method."
+    },
+    "studyType": {
+      "type": "string",
+      "description": "Descriptor for whether the credible set is derived from GWAS or molecular QTL."
+    },
+    "isTransQtl": {
+      "type": "boolean",
+      "description": "Boolean for whether this credible set is a trans-pQTL or not."
+    }
+  },
+
+  "disease": {
+    "id": {
+      "type": "string",
+      "description": "Open Targets disease identifier"
+    },
+    "code": {
+      "type": "string",
+      "description": "Disease reference URL"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the disease"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the disease"
+    },
+    "dbXRefs": {
+      "type": "array",
+      "description": "Cross-references in other disease ontologies",
+      "items": { "type": "string" }
+    },
+    "parents": {
+      "type": "array",
+      "description": "List of parent disease terms",
+      "items": { "type": "string" }
+    },
+    "synonyms": {
+      "type": "object",
+      "description": "List of synonymous disease labels",
+      "properties": {
+        "hasExactSynonym": {
+          "type": "array",
+          "description": "List of exact synonyms",
+          "items": { "type": "string" }
+        },
+        "hasRelatedSynonym": {
+          "type": "array",
+          "description": "List of related synonyms",
+          "items": { "type": "string" }
+        },
+        "hasNarrowSynonym": {
+          "type": "array",
+          "description": "List of closely related sysnonyms",
+          "items": { "type": "string" }
+        },
+        "hasBroadSynonym": {
+          "type": "array",
+          "description": "List of broadly related sysnonyms",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "obsoleteTerms": {
+      "type": "array",
+      "description": "List of obsoleted terms",
+      "items": { "type": "string" }
+    },
+    "obsoleteXRefs": {
+      "type": "array",
+      "description": "List of obsoleted cross references",
+      "items": { "type": "string" }
+    },
+    "children": {
+      "type": "array",
+      "description": "List of children disease terms",
+      "items": { "type": "string" }
+    },
+    "ancestors": {
+      "type": "array",
+      "description": "List of all ancestral disease terms",
+      "items": { "type": "string" }
+    },
+    "therapeuticAreas": {
+      "type": "array",
+      "description": "List of major therapeutic areas the disease belongs to",
+      "items": { "type": "string" }
+    },
+    "descendants": {
+      "type": "array",
+      "description": "List of all descendant terms",
+      "items": { "type": "string" }
+    },
+    "ontology": {
+      "type": "object",
+      "description": "Description of the disease's place in the ontology tree",
+      "properties": {
+        "isTherapeuticArea": {
+          "type": "boolean",
+          "description": "Boolean column indicating if a disease is root of the ontology tree, a therapeutic area"
+        },
+        "leaf": {
+          "type": "boolean",
+          "description": "Boolean column indicating if a disease is a leaf entity in the ontology tree"
+        },
+        "sources": {
+          "type": "object",
+          "description": "Source of the",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Disease URL from source"
+            },
+            "name": {
+              "type": "string",
+              "description": "Lable of the term in the ontology"
+            }
+          }
+        }
+      }
+    }
+  },
+  "disease_phenotype": {
+    "disease": {
+      "type": "string",
+      "description": "Disease identifier"
+    },
+    "phenotype": {
+      "type": "string",
+      "description": "The phenotype linked to the disease."
+    },
+    "evidence": {
+      "type": "array",
+      "description": "A container for all evidence-related attributes supporting the disease-phenotype association.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "aspect": {
+            "type": "string",
+            "description": "The category of biological information being provided (e.g., clinical, genetic, etc.)."
+          },
+          "bioCuration": {
+            "type": "string",
+            "description": "Indicates whether the evidence has been manually curated."
+          },
+          "diseaseFromSourceId": {
+            "type": "string",
+            "description": "Unique identifier for the disease from the original source."
+          },
+          "diseaseFromSource": {
+            "type": "string",
+            "description": "The disease name as recorded in the original source."
+          },
+          "diseaseName": {
+            "type": "string",
+            "description": "Standardized disease name."
+          },
+          "evidenceType": {
+            "type": "string",
+            "description": "The type of evidence supporting the disease-phenotype relationship."
+          },
+          "frequency": {
+            "type": "string",
+            "description": "The observed frequency of the phenotype in individuals with the disease."
+          },
+          "modifiers": {
+            "type": "array",
+            "description": "Additional characteristics or modifiers related to the phenotype.",
+            "items": { "type": "string" }
+          },
+          "onset": {
+            "type": "array",
+            "description": "Age or stage of disease onset for the phenotype.",
+            "items": { "type": "string" }
+          },
+          "qualifier": {
+            "type": "string",
+            "description": "Additional qualifiers specifying the phenotype-disease relationship."
+          },
+          "qualifierNot": {
+            "type": "boolean",
+            "description": "Specifies if a phenotype is not observed in a given disease."
+          },
+          "references": {
+            "type": "array",
+            "description": "References or citations supporting the evidence. [bioregistry:pubmed]",
+            "items": { "type": "string" }
+          },
+          "sex": {
+            "type": "string",
+            "description": "Indicates if the association is specific to a biological sex."
+          },
+          "resource": {
+            "type": "string",
+            "description": "The data source from which the evidence was obtained."
+          }
+        }
+      }
+    }
+  },
+  "drug_indication": {
+    "id": {
+      "type": "string",
+      "description": "Open Targets molecule identifier"
+    },
+    "indications": {
+      "type": "array",
+      "description": "List of approved and investigational indications for which a drug can be used",
+      "items": {
+        "type": "object",
+        "properties": {
+          "disease": {
+            "type": "string",
+            "description": "List of disease identifiers"
+          },
+          "efoName": {
+            "type": "string",
+            "description": "List of disease labels"
+          },
+          "references": {
+            "type": "array",
+            "description": "List of sources supporting the drug-indication relationship",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "List of source names"
+                },
+                "ids": {
+                  "type": "array",
+                  "description": "List of identification codes for the reference sources",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "maxPhaseForIndication": {
+            "type": "number",
+            "description": "Highest clinical trial phase reached for a specific indication"
+          }
+        }
+      }
+    },
+    "approvedIndications": {
+      "type": "array",
+      "description": "List of disease identifiers for a drug approved indications",
+      "items": { "type": "string" }
+    },
+    "indicationCount": {
+      "type": "integer",
+      "description": "Total number of indications for a drug"
+    }
+  },
+
+  "drug_warning": {
+    "chemblIds": {
+      "type": "array",
+      "description": "List of Open Targets molecule identifiers",
+      "items": { "type": "string" }
+    },
+    "toxicityClass": {
+      "type": "string",
+      "description": "Classification of toxicity type associated with the drug"
+    },
+    "country": {
+      "type": "string",
+      "description": "Country where the warning was issued"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the drug adverse effect"
+    },
+    "id": {
+      "type": "number",
+      "description": "Internal identifier for the drug warning record"
+    },
+    "references": {
+      "type": "array",
+      "description": "List of sources supporting the warning information",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref_id": {
+            "type": "string",
+            "description": "List of identifiers for the reference sources"
+          },
+          "ref_type": {
+            "type": "string",
+            "description": "List of bodies reporting the warning"
+          },
+          "ref_url": {
+            "type": "string",
+            "description": "List of web addresses referencing the information"
+          }
+        }
+      }
+    },
+    "warningType": {
+      "type": "string",
+      "description": "Classification of action taken (drug is withdrawn or has a black box warning)"
+    },
+    "year": {
+      "type": "number",
+      "description": "Year when the warning was issues"
+    },
+    "efo_term": {
+      "type": "string",
+      "description": "List of disease labels"
+    },
+    "efo_id": {
+      "type": "string",
+      "description": "List of disease identifiers"
+    },
+    "efo_id_for_warning_class": {
+      "type": "string",
+      "description": "Disease identifier categorising the type of warning"
+    }
+  },
+  "drug_molecule": {
+    "id": {
+      "type": "string",
+      "description": "Open Targets molecule identifier"
+    },
+    "canonicalSmiles": {
+      "type": "string",
+      "description": "Standardized chemical structure representation using SMILES notation"
+    },
+    "inchiKey": {
+      "type": "string",
+      "description": "Chemical identifier generated from the molecular structure"
+    },
+    "drugType": {
+      "type": "string",
+      "description": "Classification of the molecule's therapeutic category or chemical class (e.g. Antibody)"
+    },
+    "blackBoxWarning": {
+      "type": "boolean",
+      "description": "Flag indicating whether the drug has safety warnings"
+    },
+    "name": {
+      "type": "string",
+      "description": "Generic name of the drug molecule"
+    },
+    "yearOfFirstApproval": {
+      "type": "number",
+      "description": "Year when the drug received regulatory approval"
+    },
+    "maximumClinicalTrialPhase": {
+      "type": "number",
+      "description": "Highest clinical trial phase reached by the drug"
+    },
+    "parentId": {
+      "type": "string",
+      "description": "Open Targets molecule identifier of the parent molecule for derivative compounds"
+    },
+    "hasBeenWithdrawn": {
+      "type": "boolean",
+      "description": "Flag indicating whether the drug was removed from market"
+    },
+    "isApproved": {
+      "type": "boolean",
+      "description": "Flag indicating whether the drug has received regulatory approval"
+    },
+    "tradeNames": {
+      "type": "array",
+      "description": "List of brand names for the drug",
+      "items": { "type": "string" }
+    },
+    "synonyms": {
+      "type": "array",
+      "description": "List of alternative names for the drug",
+      "items": { "type": "string" }
+    },
+    "crossReferences": {
+      "type": "array",
+      "description": "List of identifiers in other databases",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Database source name"
+          },
+          "ids": {
+            "type": "array",
+            "description": "List of identifiers in other databases",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "childChemblIds": {
+      "type": "array",
+      "description": "List of Open Targets molecule identifiers of derivative compounds",
+      "items": { "type": "string" }
+    },
+    "linkedDiseases": {
+      "type": "object",
+      "description": "List of Open Targets disease identifiers of conditions associated with the drug",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "description": "List of Open Targets disease identifiers of conditions associated with the drug",
+          "items": { "type": "string" }
+        },
+        "count": {
+          "type": "integer",
+          "description": "Total number of Open Targets disease identifiers associated with the drug"
+        }
+      }
+    },
+    "linkedTargets": {
+      "type": "object",
+      "description": "List of Open Targets target identifiers associated with the drug",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "description": "List of Open Targets target identifiers associated with the drug",
+          "items": { "type": "string" }
+        },
+        "count": {
+          "type": "integer",
+          "description": "Total number of Open Targets target identifiers associated with the drug"
+        }
+      }
+    },
+    "description": {
+      "type": "string",
+      "description": "Summary of the drug's clinical development"
+    }
+  },
+  "pharmacogenomics": {
+    "datasourceId": {
+      "type": "string",
+      "description": "Identifier for the data provider"
+    },
+    "datasourceVersion": {
+      "type": "string",
+      "description": "Data provider version number"
+    },
+    "datatypeId": {
+      "type": "string",
+      "description": "Classification of the type of pharmacogenomic data (e.g. clinical_annotation)"
+    },
+    "directionality": {
+      "type": "string",
+      "description": "Indicates in which direction the genetic variant increases or decreases drug response"
+    },
+    "evidenceLevel": {
+      "type": "string",
+      "description": "Strength of the scientific support for the variant/drug response"
+    },
+    "genotype": {
+      "type": "string",
+      "description": "Genetic variant configuration"
+    },
+    "genotypeAnnotationText": {
+      "type": "string",
+      "description": "Explanation of the genotype's clinical significance"
+    },
+    "genotypeId": {
+      "type": "string",
+      "description": "Identifier for the specific genetic variant combination (e.g. 1_1500_A_A,T)"
+    },
+    "haplotypeFromSourceId": {
+      "type": "string",
+      "description": "Haplotype ID in the PharmKGB dataset"
+    },
+    "haplotypeId": {
+      "type": "string",
+      "description": "Combination of genetic variants that constitute a particular allele of a gene (e.g. CYP2C9*3)"
+    },
+    "literature": {
+      "type": "array",
+      "description": "PubMed identifier (PMID) of the literature entry",
+      "items": { "type": "string" }
+    },
+    "pgxCategory": {
+      "type": "string",
+      "description": "Classification of the drug response type (e.g. Toxicity)"
+    },
+    "phenotypeFromSourceId": {
+      "type": "string",
+      "description": "Open Targets disease identifier result of mapping phenotypeText"
+    },
+    "phenotypeText": {
+      "type": "string",
+      "description": "Drug response influenced by the variation"
+    },
+    "variantAnnotation": {
+      "type": "array",
+      "description": "PLACEHOLDER for variantAnnotation description",
+      "items": {
+        "type": "object",
+        "properties": {
+          "baseAlleleOrGenotype": {
+            "type": "string",
+            "description": "PLACEHOLDER for baseAlleleOrGenotype description"
+          },
+          "comparisonAlleleOrGenotype": {
+            "type": "string",
+            "description": "PLACEHOLDER for comparisonAlleleOrGenotype description"
+          },
+          "directionality": {
+            "type": "string",
+            "description": "PLACEHOLDER for directionality description"
+          },
+          "effect": {
+            "type": "string",
+            "description": "PLACEHOLDER for effect description"
+          },
+          "effectDescription": {
+            "type": "string",
+            "description": "PLACEHOLDER for effectDescription description"
+          },
+          "effectType": {
+            "type": "string",
+            "description": "PLACEHOLDER for effectType description"
+          },
+          "entity": {
+            "type": "string",
+            "description": "PLACEHOLDER for entity description"
+          },
+          "literature": {
+            "type": "string",
+            "description": "PLACEHOLDER for literature description"
+          }
+        }
+      }
+    },
+    "studyId": {
+      "type": "string",
+      "description": "Clinical Annotation ID in the PharmKGB dataset"
+    },
+    "targetFromSourceId": {
+      "type": "string",
+      "description": "Open Targets target identifier as provided by the data source"
+    },
+    "variantFunctionalConsequenceId": {
+      "type": "string",
+      "description": "The sequence ontology identifier of the consequence of the variant based on Ensembl VEP in the context of the transcript [bioregistry:so]"
+    },
+    "variantRsId": {
+      "type": "string",
+      "description": "Variant reference SNP cluster ID (Rsid)"
+    },
+    "variantId": {
+      "type": "string",
+      "description": "The unique identifier for the variant following schema: {chromosome}-{position}-{referenceAllele}-{alternateAllele}"
+    },
+    "isDirectTarget": {
+      "type": "boolean",
+      "description": "Flag indicating whether the target overlapping the variation is directly targeted by the drug"
+    },
+    "drugs": {
+      "type": "array",
+      "description": "List of drugs affected by this genetic variation",
+      "items": {
+        "type": "object",
+        "properties": {
+          "drugFromSource": {
+            "type": "string",
+            "description": "List of drug identifiers from the original data source"
+          },
+          "drugId": {
+            "type": "string",
+            "description": "List of Open Targets drug identifiers"
+          }
+        }
+      }
+    }
+  },
+
+  "study": {
+    "studyId": {
+      "type": "string",
+      "description": "Unique identifier of the GWAS or molQTL study."
+    },
+    "geneId": {
+      "type": "string",
+      "description": "Ensembl identifier of the gene representing a specific gene whose molecular is being analysed in molQTL study. [bioregistry:ensembl]"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Identifier of the source project collection that the study information is derived from."
+    },
+    "studyType": {
+      "type": "string",
+      "description": "Field specifying if study contains phenotype/disease or molecular genetic associations."
+    },
+    "traitFromSource": {
+      "type": "string",
+      "description": "Molecular or phenotypic trait, derived from source, analysed in the study."
+    },
+    "traitFromSourceMappedIds": {
+      "type": "array",
+      "description": "Phenotypic trait ids that map to the analysed trait reported by study.",
+      "items": { "type": "string" }
+    },
+    "biosampleFromSourceId": {
+      "type": "string",
+      "description": "Identifier of the referenced biological material."
+    },
+    "pubmedId": {
+      "type": "string",
+      "description": "PubMed identifier of the publication hat references the study. [bioregistry:pubmed]"
+    },
+    "publicationTitle": {
+      "type": "string",
+      "description": "Title of the publication that references the study."
+    },
+    "publicationFirstAuthor": {
+      "type": "string",
+      "description": "Last name and initials of the author of the publication that references the study."
+    },
+    "publicationDate": {
+      "type": "string",
+      "description": "Date of the publication that references study."
+    },
+    "publicationJournal": {
+      "type": "string",
+      "description": "Abbreviated journal name where the publication referencing study was published."
+    },
+    "backgroundTraitFromSourceMappedIds": {
+      "type": "array",
+      "description": "Any background trait(s) shared by all individuals in the study.",
+      "items": { "type": "string" }
+    },
+    "initialSampleSize": {
+      "type": "string",
+      "description": "Study initial sample size."
+    },
+    "nCases": {
+      "type": "integer",
+      "description": "The number of cases in this broad ancestry group."
+    },
+    "nControls": {
+      "type": "integer",
+      "description": "The number of controls in this broad ancestry group."
+    },
+    "nSamples": {
+      "type": "integer",
+      "description": "The number of samples tested in GWAS analysis"
+    },
+    "cohorts": {
+      "type": "array",
+      "description": "List of cohort(s) represented in the discovery sample.",
+      "items": { "type": "string" }
+    },
+    "ldPopulationStructure": {
+      "type": "array",
+      "description": "Collection of populations referenced by the study.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ldPopulation": {
+            "type": "string",
+            "description": "Population identifier."
+          },
+          "relativeSampleSize": {
+            "type": "number",
+            "description": "Fraction of the total sample represented by the population."
+          }
+        }
+      }
+    },
+    "discoverySamples": {
+      "type": "array",
+      "description": "Collection of ancestries reported by the study discovery phase.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sampleSize": {
+            "type": "integer",
+            "description": "Discovery sample size."
+          },
+          "ancestry": {
+            "type": "string",
+            "description": "Discovery sample ancestry name."
+          }
+        }
+      }
+    },
+    "replicationSamples": {
+      "type": "array",
+      "description": "Collection of ancestries reported by the study replication phase.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sampleSize": {
+            "type": "integer",
+            "description": "Replication sample size."
+          },
+          "ancestry": {
+            "type": "string",
+            "description": "Replication sample ancestry name."
+          }
+        }
+      }
+    },
+    "qualityControls": {
+      "type": "array",
+      "description": "Control metrics refining study validation.",
+      "items": { "type": "string" }
+    },
+    "analysisFlags": {
+      "type": "array",
+      "description": "Collection of flags indicating the type of the analysis conducted in the association study.",
+      "items": { "type": "string" }
+    },
+    "summarystatsLocation": {
+      "type": "string",
+      "description": "Path to the source study summary statistics (if exists at the source)"
+    },
+    "hasSumstats": {
+      "type": "boolean",
+      "description": "Indication whether the summary statistics exist in the source."
+    },
+    "condition": {
+      "type": "string",
+      "description": "Reported sample conditions."
+    },
+    "sumstatQCValues": {
+      "type": "array",
+      "description": "Mapping of quality control flags.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "QCCheckName": {
+            "type": "string",
+            "description": "Quality control metric identifier."
+          },
+          "QCCheckValue": {
+            "type": "number",
+            "description": "Quality control metric value."
+          }
+        }
+      }
+    },
+    "diseaseIds": {
+      "type": "array",
+      "description": "Disease identifier associated with a studied trait.",
+      "items": { "type": "string" }
+    },
+    "backgroundDiseaseIds": {
+      "type": "array",
+      "description": "Any background disease(s) shared by all individuals in the study.",
+      "items": { "type": "string" }
+    },
+    "biosampleId": {
+      "type": "string",
+      "description": "Biosample identifier that maps to the biosample reported by study. [bioregistry:uberon]"
+    }
+  },
+  "disease_hpo": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the disease in the Human Phenotype Ontology (HPO)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the disease (in HPO)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the disease"
+    },
+    "dbXRefs": {
+      "type": "array",
+      "description": "Database cross-references for the HPO disease",
+      "items": { "type": "string" }
+    },
+    "parents": {
+      "type": "array",
+      "description": "List of parent terms for the disease",
+      "items": { "type": "string" }
+    },
+    "obsoleteTerms": {
+      "type": "array",
+      "description": "List of obsolete terms for the disease",
+      "items": { "type": "string" }
+    }
+  },
+  "known_drug": {
+    "drugId": {
+      "type": "string",
+      "description": "Open Targets molecule identifier"
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Open Targets target identifier"
+    },
+    "diseaseId": {
+      "type": "string",
+      "description": "Open Targets disease identifier"
+    },
+    "phase": {
+      "type": "number",
+      "description": "Clinical development stage of the drug"
+    },
+    "status": {
+      "type": "string",
+      "description": "Clinical trial status for the drug/indication pair"
+    },
+    "urls": {
+      "type": "array",
+      "description": "List of web addresses that support the drug/indication pair",
+      "items": {
+        "type": "object",
+        "properties": {
+          "niceName": {
+            "type": "string",
+            "description": "List of human readable names for the reference source"
+          },
+          "url": {
+            "type": "string",
+            "description": "List of web addresses that support the drug/indication pair"
+          }
+        }
+      }
+    },
+    "ancestors": {
+      "type": "array",
+      "description": "List of parent disease terms of the condition being treated",
+      "items": { "type": "string" }
+    },
+    "label": {
+      "type": "string",
+      "description": "Disease label for the condition being treated"
+    },
+    "approvedSymbol": {
+      "type": "string",
+      "description": "Approved gene symbol of the target modulated by the drug"
+    },
+    "approvedName": {
+      "type": "string",
+      "description": "Approved full name of the gene or gene product modulated by the drug"
+    },
+    "targetClass": {
+      "type": "array",
+      "description": "Classification category of the drug's biological target (e.g. Enzyme)",
+      "items": { "type": "string" }
+    },
+    "prefName": {
+      "type": "string",
+      "description": "Commonly used name for the drug"
+    },
+    "tradeNames": {
+      "type": "array",
+      "description": "List of brand names for the drug",
+      "items": { "type": "string" }
+    },
+    "synonyms": {
+      "type": "array",
+      "description": "List of alternative names to refer to the drug",
+      "items": { "type": "string" }
+    },
+    "drugType": {
+      "type": "string",
+      "description": "Classification of the modality of the drug (e.g. Small molecule)"
+    },
+    "mechanismOfAction": {
+      "type": "string",
+      "description": "Drug pharmacological action"
+    },
+    "targetName": {
+      "type": "string",
+      "description": "Full name of the gene or gene product modulated by the drug, as referred by ChEMBL"
+    }
+  },
+
+  "literature": {
+    "pmid": {
+      "type": "string",
+      "description": "PubMed identifier (PMID) of the literature entry"
+    },
+    "pmcid": {
+      "type": "string",
+      "description": "PubMed Central ID (PMCID) of the literature entry"
+    },
+    "date": {
+      "type": "string",
+      "description": "Date of publication in YYYY-MM-DD format"
+    },
+    "year": {
+      "type": "integer",
+      "description": "Year of publication"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Month of publication"
+    },
+    "day": {
+      "type": "integer",
+      "description": "Day of publication"
+    },
+    "keywordId": {
+      "type": "string",
+      "description": "Unique identifier for the keyword associated with the literature entry"
+    },
+    "relevance": {
+      "type": "number",
+      "description": "Relevance score of the keyword within the literature entry"
+    },
+    "keywordType": {
+      "type": "string",
+      "description": "Type of keyword identified in the literature entry. Values: DS: disease/syndrome, GP: gene/protein, CD: chemical/drug"
+    }
+  },
+  "literature_vector": {
+    "category": {
+      "type": "string",
+      "description": "Category of the entity match in the literature. Either target, drug or disease"
+    },
+    "word": {
+      "type": "string",
+      "description": "Normalised identifier of the matched entity"
+    },
+    "norm": {
+      "type": "number",
+      "description": "Normalized form of the extracted word"
+    },
+    "vector": {
+      "type": "array",
+      "description": "Vector representation of the word based on word embedding",
+      "items": { "type": "number" }
+    }
+  },
+  "l2g_prediction": {
+    "studyLocusId": {
+      "type": "string",
+      "description": "Study-locus identifier for the credible set"
+    },
+    "geneId": {
+      "type": "string",
+      "description": "Identifier of the gene / target"
+    },
+    "score": {
+      "type": "number",
+      "description": "Locus-to-gene score prediction for the given studyLocusId-geneId pair"
+    },
+    "features": {
+      "type": "array",
+      "description": "List of Locus to Gene feature values",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the feature used in locus to gene prediction"
+          },
+          "value": {
+            "type": "number",
+            "description": "Value of the feature"
+          },
+          "shapValue": {
+            "type": "number",
+            "description": "SHAP value of the feature"
+          }
+        }
+      }
+    },
+    "shapBaseValue": {
+      "type": "number",
+      "description": "SHAP base value"
+    }
+  },
+  "interaction": {
+    "sourceDatabase": {
+      "type": "string",
+      "description": "Source database reporting the molecular interaction."
+    },
+    "targetA": {
+      "type": "string",
+      "description": "Open Targets target identifier of the first molecule (target A) in the interaction. [bioregistry:ensembl]"
+    },
+    "intA": {
+      "type": "string",
+      "description": "Identifier for target A in source"
+    },
+    "intABiologicalRole": {
+      "type": "string",
+      "description": "Biological role of target A in the interaction."
+    },
+    "targetB": {
+      "type": "string",
+      "description": "Open Targets target identifier of the second molecule (target B) in the interaction. [bioregistry:ensembl]"
+    },
+    "intB": {
+      "type": "string",
+      "description": "Identifier for target B in source"
+    },
+    "intBBiologicalRole": {
+      "type": "string",
+      "description": "Biological role of target B in the interaction"
+    },
+    "speciesA": {
+      "type": "object",
+      "description": "Taxonomic annotation of target A",
+      "properties": {
+        "mnemonic": {
+          "type": "string",
+          "description": "Short mnemonic name of the species associated with target A"
+        },
+        "scientific_name": {
+          "type": "string",
+          "description": "Scientific name of the species associated with target A"
+        },
+        "taxon_id": {
+          "type": "number",
+          "description": "NCBI taxon ID of the species associated with target A"
+        }
+      }
+    },
+    "speciesB": {
+      "type": "object",
+      "description": "Taxonomic annotation of target B",
+      "properties": {
+        "mnemonic": {
+          "type": "string",
+          "description": "Short mnemonic name of the species associated with target B"
+        },
+        "scientific_name": {
+          "type": "string",
+          "description": "Scientific name of the species associated with target B"
+        },
+        "taxon_id": {
+          "type": "number",
+          "description": "NCBI taxon ID of the species associated with target B"
+        }
+      }
+    },
+    "count": {
+      "type": "number",
+      "description": "Number of interaction occurrences reported in the source databases."
+    },
+    "scoring": {
+      "type": "number",
+      "description": "Scoring or confidence value assigned to the interaction."
+    }
+  },
+
+  "interaction_evidence": {
+    "participantDetectionMethodA": {
+      "type": "array",
+      "description": "Detection method used to identify participant A in the interaction",
+      "items": {
+        "type": "object",
+        "properties": {
+          "miIdentifier": {
+            "type": "string",
+            "description": "Molecular Interactions (MI) identifier for participant A’s detection method [bioregistry:mi]"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Short name of participant A’s detection method"
+          }
+        }
+      }
+    },
+    "participantDetectionMethodB": {
+      "type": "array",
+      "description": "Detection method used to identify participant B in the interaction",
+      "items": {
+        "type": "object",
+        "properties": {
+          "miIdentifier": {
+            "type": "string",
+            "description": "Molecular Interactions (MI) identifier for participant B’s detection method [bioregistry:mi]"
+          },
+          "shortName": {
+            "type": "string",
+            "description": "Short name of participant B’s detection method"
+          }
+        }
+      }
+    },
+    "hostOrganismTaxId": {
+      "type": "number",
+      "description": "NCBI taxon ID of the host organism"
+    },
+    "targetB": {
+      "type": "string",
+      "description": "Open Targets target identifier of the second molecule (target B) in the interaction [bioregistry:ensembl]"
+    },
+    "evidenceScore": {
+      "type": "number",
+      "description": "Score indicating the confidence or strength of the interaction evidence"
+    },
+    "expansionMethodShortName": {
+      "type": "string",
+      "description": "Short name of the method used to expand the interaction dataset"
+    },
+    "hostOrganismScientificName": {
+      "type": "string",
+      "description": "Scientific name of the host organism in which the interaction was observed"
+    },
+    "intBBiologicalRole": {
+      "type": "string",
+      "description": "Biological role of target B in the interaction"
+    },
+    "interactionResources": {
+      "type": "object",
+      "description": "Databases providing evidence for the interaction",
+      "properties": {
+        "databaseVersion": {
+          "type": "string",
+          "description": "Version of the source database providing interaction evidence"
+        },
+        "sourceDatabase": {
+          "type": "string",
+          "description": "Name of the source database reporting the interaction evidence"
+        }
+      }
+    },
+    "interactionDetectionMethodShortName": {
+      "type": "string",
+      "description": "Short name of the method used to detect the interaction"
+    },
+    "intA": {
+      "type": "string",
+      "description": "Identifier for target A in source"
+    },
+    "intBSource": {
+      "type": "string",
+      "description": "Source where interactor B is identified"
+    },
+    "interactionTypeMiIdentifier": {
+      "type": "string",
+      "description": "Molecular Interactions (MI) identifier for the type of interaction [bioregistry:mi]"
+    },
+    "speciesB": {
+      "type": "object",
+      "description": "Taxonomic annotation of target B",
+      "properties": {
+        "mnemonic": {
+          "type": "string",
+          "description": "Short mnemonic name of the species associated with target B"
+        },
+        "scientificName": {
+          "type": "string",
+          "description": "Scientific name of the species associated with target B"
+        },
+        "taxonId": {
+          "type": "number",
+          "description": "NCBI taxon ID of the species associated with target B"
+        }
+      }
+    },
+    "expansionMethodMiIdentifier": {
+      "type": "string",
+      "description": "Molecular Interactions (MI) identifier for the expansion method used [bioregistry:mi]"
+    },
+    "interactionTypeShortName": {
+      "type": "string",
+      "description": "Short name of the interaction type"
+    },
+    "interactionIdentifier": {
+      "type": "string",
+      "description": "Unique identifier for the interaction evidence entry at the source"
+    },
+    "hostOrganismTissue": {
+      "type": "object",
+      "description": "Tissue of the host organism, where the interaction was identified",
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the tissue"
+        },
+        "shortName": {
+          "type": "string",
+          "description": "Short name of the tissue"
+        },
+        "xrefs": {
+          "type": "array",
+          "description": "Cross-references to external databases for the host organism's tissue",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "speciesA": {
+      "type": "object",
+      "description": "Taxonomic annotation of target A",
+      "properties": {
+        "mnemonic": {
+          "type": "string",
+          "description": "Short mnemonic name of the species associated with target A"
+        },
+        "scientificName": {
+          "type": "string",
+          "description": "Scientific name of the species associated with target A"
+        },
+        "taxonId": {
+          "type": "number",
+          "description": "NCBI taxon ID of the species associated with target A"
+        }
+      }
+    },
+    "intASource": {
+      "type": "string",
+      "description": "Source where interactor B is identified"
+    },
+    "intB": {
+      "type": "string",
+      "description": "Identifier for target B in source"
+    },
+    "pubmedId": {
+      "type": "string",
+      "description": "PubMed ID of the publication supporting the interaction evidence"
+    },
+    "intABiologicalRole": {
+      "type": "string",
+      "description": "Biological role of target A in the interaction"
+    },
+    "interactionScore": {
+      "type": "number",
+      "description": "Score assigned to the interaction based on supporting evidence"
+    },
+    "targetA": {
+      "type": "string",
+      "description": "Open Targets target identifier of the second molecule (target A) in the interaction [bioregistry:ensembl]"
+    },
+    "interactionDetectionMethodMiIdentifier": {
+      "type": "string",
+      "description": "Molecular Interactions (MI) identifier for the interaction detection method [bioregistry:mi]"
+    }
+  },
+  "mouse_phenotype": {
+    "biologicalModels": {
+      "type": "array",
+      "description": "Container for all biological model-related attributes.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "allelicComposition": {
+            "type": "string",
+            "description": "The specific allelic composition of the mouse model."
+          },
+          "geneticBackground": {
+            "type": "string",
+            "description": "The genetic background strain of the mouse model."
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the biological model. [bioregistry:mgi]"
+          },
+          "literature": {
+            "type": "array",
+            "description": "References related to the mouse model. [bioregistry:pubmed]",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "modelPhenotypeClasses": {
+      "type": "array",
+      "description": "Container for phenotype class-related attributes.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the phenotype class. [bioregistry:mp]"
+          },
+          "label": {
+            "type": "string",
+            "description": "Descriptive label for the phenotype class."
+          }
+        }
+      }
+    },
+    "modelPhenotypeId": {
+      "type": "string",
+      "description": "Identifier for the specific phenotype observed in the model. [bioregistry:mp]"
+    },
+    "modelPhenotypeLabel": {
+      "type": "string",
+      "description": "Human-readable label describing the observed phenotype."
+    },
+    "targetFromSourceId": {
+      "type": "string",
+      "description": "Identifier for the human target as provided by the data source."
+    },
+    "targetInModel": {
+      "type": "string",
+      "description": "Name of the target gene as represented in the mouse model."
+    },
+    "targetInModelEnsemblId": {
+      "type": "string",
+      "description": "Ensembl identifier for the target gene in the mouse model. [bioregistry:ensembl]"
+    },
+    "targetInModelMgiId": {
+      "type": "string",
+      "description": "MGI (Mouse Genome Informatics) identifier for the target gene in the model. [bioregistry:mgi]"
+    }
+  },
+  "openfda_significant_adverse_drug_reactions": {
+    "chembl_id": {
+      "type": "string",
+      "description": "Unique identifier for the drug or clinical candidate"
+    },
+    "event": {
+      "type": "string",
+      "description": "Reported adverse drug reaction associated with the drug."
+    },
+    "count": {
+      "type": "number",
+      "description": "Number of occurrences of the adverse event in the dataset."
+    },
+    "llr": {
+      "type": "number",
+      "description": "Log-likelihood ratio (LLR) measuring the strength of the association between the drug and the adverse event."
+    },
+    "critval": {
+      "type": "number",
+      "description": "Critical value used to determine statistical significance of the association."
+    },
+    "meddraCode": {
+      "type": "string",
+      "description": "Medical Dictionary for Regulatory Activities (MedDRA) code for the adverse drug reaction."
+    }
+  },
+
+  "openfda_significant_adverse_target_reactions": {
+    "targetId": {
+      "type": "string",
+      "description": "Unique identifier for the drug target"
+    },
+    "event": {
+      "type": "string",
+      "description": "Reported adverse drug reactions associated with drugs targeting the molecule."
+    },
+    "count": {
+      "type": "number",
+      "description": "Number of occurrences of adverse events in the dataset when looking at all drugs targeting the same molecule."
+    },
+    "llr": {
+      "type": "number",
+      "description": "Log-likelihood ratio (LLR) measuring the strength of the association between all drugs targeting the same molecule and the adverse event."
+    },
+    "critval": {
+      "type": "number",
+      "description": "Critical value used to determine statistical significance of the association."
+    },
+    "meddraCode": {
+      "type": "string",
+      "description": "Medical Dictionary for Regulatory Activities (MedDRA) code for the adverse drug reaction."
+    }
+  },
+  "so": {
+    "id": {
+      "type": "string",
+      "description": "Sequence ontology term identifier [bioregistry:so]"
+    },
+    "label": {
+      "type": "string",
+      "description": "Sequence ontology term label"
+    }
+  },
+
+  "target": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the target [bioregistry:ensembl]"
+    },
+    "approvedSymbol": {
+      "type": "string",
+      "description": "Approved gene symbol of the target"
+    },
+    "biotype": {
+      "type": "string",
+      "description": "Biotype classification of the target gene, indicating if the gene is protein coding"
+    },
+    "transcriptIds": {
+      "type": "array",
+      "description": "List of Ensembl transcript identifiers associated with the target",
+      "items": { "type": "string" }
+    },
+    "canonicalTranscript": {
+      "type": "object",
+      "description": "The Ensembl canonical transcript of the target gene",
+      "properties": {
+        "id": { "type": "string", "description": "The Ensembl transcript identifier for the canonical transcript" },
+        "chromosome": { "type": "string", "description": "Chromosome location of the canonical transcript" },
+        "start": { "type": "number", "description": "Genomic start position of the canonical transcript" },
+        "end": { "type": "number", "description": "Genomic end position of the canonical transcript" },
+        "strand": { "type": "string", "description": "Strand orientation of the canonical transcript" }
+      }
+    },
+    "canonicalExons": {
+      "type": "array",
+      "description": "List of canonical exons for the target gene",
+      "items": { "type": "string" }
+    },
+    "genomicLocation": {
+      "type": "object",
+      "description": "Genomic location information of the target gene",
+      "properties": {
+        "chromosome": { "type": "string", "description": "Chromosome on which the target located" },
+        "start": { "type": "number", "description": "Genomic start position of the target gene" },
+        "end": { "type": "number", "description": "Genomic end position of the target gene" },
+        "strand": { "type": "integer", "description": "Strand orientation of the target gene" }
+      }
+    },
+    "alternativeGenes": {
+      "type": "array",
+      "description": "List of alternative Ensembl gene identifiers mapped to non-canonical chromosomes",
+      "items": { "type": "string" }
+    },
+    "approvedName": {
+      "type": "string",
+      "description": "Approved full name of the target gene"
+    },
+    "go": {
+      "type": "array",
+      "description": "List of Gene Ontology (GO) annotations related to the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "GO identifier for the annotation [bioregistry:go]" },
+          "source": { "type": "string", "description": "Source database and identifer where the ontology term was sourced from" },
+          "evidence": { "type": "string", "description": "Evidence supporting the GO annotation" },
+          "aspect": { "type": "string", "description": "Type of the GO annotation: molecular function (F), biological process (P) and cellular localisation (C)" },
+          "geneProduct": { "type": "string", "description": "Gene product associated with the GO annotation [bioregistry:uniprot]" },
+          "ecoId": { "type": "string", "description": "Evidence & Conclusion Ontology (ECO) identifier for the GO annotation [bioregistry:eco]" }
+        }
+      }
+    },
+    "hallmarks": {
+      "type": "object",
+      "description": "Hallmarks related to the target gene sourced from COSMIC",
+      "properties": {
+        "attributes": {
+          "type": "array",
+          "description": "Attributes of the hallmark annotation",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pmid": { "type": "number", "description": "PubMed ID of the supporting literature for the hallmark attribute [bioregistry:pubmed]" },
+              "description": { "type": "string", "description": "Description of the hallmark attribute" },
+              "attribute_name": { "type": "string", "description": "Name of the hallmark attribute" }
+            }
+          }
+        },
+        "cancerHallmarks": {
+          "type": "array",
+          "description": "Cancer hallmarks associated with the target gene",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pmid": { "type": "number", "description": "PubMed ID of the supporting literature for the cancer hallmark [bioregistry:pubmed]" },
+              "description": { "type": "string", "description": "Description of the cancer hallmark" },
+              "impact": { "type": "string", "description": "Impact of the cancer hallmark on the target" },
+              "label": { "type": "string", "description": "Label associated with the cancer hallmark" }
+            }
+          }
+        }
+      }
+    },
+    "synonyms": {
+      "type": "array",
+      "description": "List of synonyms for the target gene",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "Synonym label for the target" },
+          "source": { "type": "string", "description": "Source database of the synonym" }
+        }
+      }
+    },
+    "symbolSynonyms": {
+      "type": "array",
+      "description": "List of symbol-based synonyms for the target gene",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "Symbol synonym label for the target" },
+          "source": { "type": "string", "description": "Source of the symbol synonym" }
+        }
+      }
+    },
+    "nameSynonyms": {
+      "type": "array",
+      "description": "List of name-based synonyms for the target gene",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "Name synonym label for the target" },
+          "source": { "type": "string", "description": "Source of the name synonym" }
+        }
+      }
+    },
+    "functionDescriptions": {
+      "type": "array",
+      "description": "Functional descriptions of the target gene sourced from UniProt",
+      "items": { "type": "string" }
+    },
+    "subcellularLocations": {
+      "type": "array",
+      "description": "List of subcellular locations where the target protein is found",
+      "items": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "string", "description": "Name of the subcellular compartment where the protein was found" },
+          "source": { "type": "string", "description": "Source database for the subcellular location" },
+          "termSL": { "type": "string", "description": "Subcellular location term identifier from SwissProt [bioregistry:sl]" },
+          "labelSL": { "type": "string", "description": "Subcellular location category from SwissProt" }
+        }
+      }
+    },
+    "targetClass": {
+      "type": "array",
+      "description": "Target classification categories from ChEMBL",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "number", "description": "Unique identifier for the target class" },
+          "label": { "type": "string", "description": "Label for the target class" },
+          "level": { "type": "string", "description": "Hierarchical level of the target class" }
+        }
+      }
+    },
+    "obsoleteSymbols": {
+      "type": "array",
+      "description": "List of obsolete symbols previously used for the target gene",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "Obsolete symbol label" },
+          "source": { "type": "string", "description": "Source of the obsolete symbol" }
+        }
+      }
+    },
+    "obsoleteNames": {
+      "type": "array",
+      "description": "List of obsolete names previously used for the target gene",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "description": "Obsolete name label" },
+          "source": { "type": "string", "description": "Source of the obsolete name" }
+        }
+      }
+    },
+    "constraint": {
+      "type": "array",
+      "description": "Constraint scores for the target gene from GnomAD",
+      "items": {
+        "type": "object",
+        "properties": {
+          "constraintType": { "type": "string", "description": "Type of constraint applied to the target" },
+          "score": { "type": "number", "description": "Constraint score indicating gene intolerance" },
+          "exp": { "type": "number", "description": "Expected constraint score" },
+          "obs": { "type": "integer", "description": "Observed constraint score" },
+          "oe": { "type": "number", "description": "Observed/Expected (OE) constraint score" },
+          "oeLower": { "type": "number", "description": "Lower bound of the OE constraint score" },
+          "oeUpper": { "type": "number", "description": "Upper bound of the OE constraint score" },
+          "upperRank": { "type": "integer", "description": "Rank of the target gene in constraint analysis" },
+          "upperBin": { "type": "integer", "description": "Binned category for the constraint score" },
+          "upperBin6": { "type": "integer", "description": "Six-bin classification of the constraint score" }
+        }
+      }
+    },
+    "tep": {
+      "type": "object",
+      "description": "Target Enabling Package (TEP) information",
+      "properties": {
+        "targetFromSourceId": { "type": "string", "description": "Ensembl gene ID for the TEP target" },
+        "description": { "type": "string", "description": "Description of the TEP target" },
+        "therapeuticArea": { "type": "string", "description": "Therapeutic area associated with the TEP target" },
+        "url": { "type": "string", "description": "URL linking to more information on the TEP target" }
+      }
+    },
+    "proteinIds": {
+      "type": "array",
+      "description": "Protein identifiers associated with the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Protein ID for the target" },
+          "source": { "type": "string", "description": "Source database for the protein ID" }
+        }
+      }
+    },
+    "dbXrefs": {
+      "type": "array",
+      "description": "Database cross-references for the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Cross-reference ID for external databases" },
+          "source": { "type": "string", "description": "Source database for the cross-reference" }
+        }
+      }
+    },
+    "chemicalProbes": {
+      "type": "array",
+      "description": "Chemical probes related to the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "control": { "type": "string", "description": "Whether the chemical probe serves as a control" },
+          "drugId": { "type": "string", "description": "Drug ID associated with the chemical probe" },
+          "id": { "type": "string", "description": "Unique identifier for the chemical probe" },
+          "isHighQuality": { "type": "boolean", "description": "Indicates if the chemical probe is high quality" },
+          "mechanismOfAction": {
+            "type": "array",
+            "description": "Mechanism of action of the chemical probe",
+            "items": { "type": "string" }
+          },
+          "origin": {
+            "type": "array",
+            "description": "Origin of the chemical probe",
+            "items": { "type": "string" }
+          },
+          "probeMinerScore": { "type": "number", "description": "Score from ProbeMiner for chemical probe quality" },
+          "probesDrugsScore": { "type": "number", "description": "Score for chemical probes related to druggability" },
+          "scoreInCells": { "type": "number", "description": "Score indicating chemical probe activity in cells" },
+          "scoreInOrganisms": { "type": "number", "description": "Score indicating chemical probe activity in organisms" },
+          "targetFromSourceId": { "type": "string", "description": "Ensembl gene ID of the target for the chemical probe" },
+          "urls": {
+            "type": "array",
+            "description": "URLs linking to more information about the chemical probe",
+            "items": {
+              "type": "object",
+              "properties": {
+                "niceName": { "type": "string", "description": "Nice name for the linked URL" },
+                "url": { "type": "string", "description": "URL providing details about the chemical probe" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "homologues": {
+      "type": "array",
+      "description": "Homologues of the target gene in other species",
+      "items": {
+        "type": "object",
+        "properties": {
+          "speciesId": { "type": "string", "description": "Species ID for the homologue" },
+          "speciesName": { "type": "string", "description": "Species name for the homologue" },
+          "homologyType": { "type": "string", "description": "Type of homology relationship" },
+          "targetGeneId": { "type": "string", "description": "Target gene ID of the homologue" },
+          "isHighConfidence": { "type": "string", "description": "Indicates if the homology is high confidence" },
+          "targetGeneSymbol": { "type": "string", "description": "Gene symbol of the homologous target" },
+          "queryPercentageIdentity": { "type": "number", "description": "Percentage identity of the query gene in the homologue" },
+          "targetPercentageIdentity": { "type": "number", "description": "Percentage identity of the homologue in the query gene" },
+          "priority": { "type": "integer", "description": "Priority score for the homologue" }
+        }
+      }
+    },
+    "tractability": {
+      "type": "array",
+      "description": "Tractability information for the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "modality": { "type": "string", "description": "Modality of the tractability assessment" },
+          "id": { "type": "string", "description": "Unique identifier for the tractability category" },
+          "value": { "type": "boolean", "description": "Tractability value assigned to the target" }
+        }
+      }
+    },
+    "safetyLiabilities": {
+      "type": "array",
+      "description": "Safety liabilities associated with the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string", "description": "Safety event associated with the target" },
+          "eventId": { "type": "string", "description": "Unique identifier for the safety event" },
+          "effects": {
+            "type": "array",
+            "description": "Effects reported for the safety event",
+            "items": {
+              "type": "object",
+              "properties": {
+                "direction": { "type": "string", "description": "Direction of the reported effect (e.g., increase or decrease)" },
+                "dosing": { "type": "string", "description": "Dosing conditions related to the reported effect" }
+              }
+            }
+          },
+          "biosamples": {
+            "type": "array",
+            "description": "Biosamples used in safety assessments",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cellFormat": { "type": "string", "description": "Format of the biosample cells" },
+                "cellLabel": { "type": "string", "description": "Label of the biosample cell" },
+                "tissueId": { "type": "string", "description": "Tissue ID for the biosample" },
+                "tissueLabel": { "type": "string", "description": "Label of the biosample tissue" }
+              }
+            }
+          },
+          "datasource": { "type": "string", "description": "Data source reporting the safety liability" },
+          "literature": { "type": "string", "description": "Literature references for the safety liability" },
+          "url": { "type": "string", "description": "URL linking to more details on safety liabilities" },
+          "studies": {
+            "type": "array",
+            "description": "Studies related to safety assessments",
+            "items": {
+              "type": "object",
+              "properties": {
+                "description": { "type": "string", "description": "Description of the safety study" },
+                "name": { "type": "string", "description": "Name of the safety study" },
+                "type": { "type": "string", "description": "Type of safety study" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pathways": {
+      "type": "array",
+      "description": "Pathway annotations for the target",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pathwayId": { "type": "string", "description": "Unique identifier for the pathway" },
+          "pathway": { "type": "string", "description": "Name of the pathway" },
+          "topLevelTerm": { "type": "string", "description": "Top-level term categorizing the pathway" }
+        }
+      }
+    },
+    "tss": {
+      "type": "number",
+      "description": "Transcription Start Site (TSS) information for the target"
+    }
+  },
+
+  "gene_essentiality": {
+    "id": {
+      "type": "string",
+      "description": "Target identifier the essentiality was measured on [bioregistry:ensembl]"
+    },
+    "geneEssentiality": {
+      "type": "array",
+      "description": "Essentiality measurements of the gene based on CRISPR screening data in different cellular models",
+      "items": {
+        "type": "object",
+        "properties": {
+          "depMapEssentiality": {
+            "type": "array",
+            "description": "Essentiality measurements extraced from Depmap, stratified by tissue or anatomical units",
+            "items": {
+              "type": "object",
+              "properties": {
+                "screens": {
+                  "type": "array",
+                  "description": "List of CRISPR screening experiments supporting the essentiality assessment",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "cellLineName": {
+                        "type": "string",
+                        "description": "Name of the cancer cell line in which the gene essentiality was assessed"
+                      },
+                      "depmapId": {
+                        "type": "string",
+                        "description": "Unique identifier of the assay in DepMap"
+                      },
+                      "diseaseCellLineId": {
+                        "type": "string",
+                        "description": "Cell modell passport identifier of a celline modelling a disease"
+                      },
+                      "diseaseFromSource": {
+                        "type": "string",
+                        "description": "Disease associated with the cell line as reported in the source data"
+                      },
+                      "expression": {
+                        "type": "number",
+                        "description": "Gene expression level in the corresponding cell line"
+                      },
+                      "geneEffect": {
+                        "type": "number",
+                        "description": "Gene effect score indicating the impact of gene knockout"
+                      },
+                      "mutation": {
+                        "type": "string",
+                        "description": "Background mutation the tested cell line have"
+                      }
+                    }
+                  }
+                },
+                "tissueId": {
+                  "type": "string",
+                  "description": "Identifier of the tissue from where the cells were sample for assay [bioregistry:uberon]"
+                },
+                "tissueName": {
+                  "type": "string",
+                  "description": "Name of the tissue from where the cells were sample for assay"
+                }
+              }
+            }
+          },
+          "isEssential": {
+            "type": "boolean",
+            "description": "Boolean flag indicating whether the tested gene is considered essential in the given context"
+          }
+        }
+      }
+    }
+  },
+  "evidence": {
+    "datasourceId": {
+      "type": "string",
+      "description": "Identifer of the evidence source"
+    },
+    "targetId": {
+      "type": "string",
+      "description": "Open Targets target identifier"
+    },
+    "alleleOrigins": {
+      "type": "array",
+      "description": "Origin of the variant allele",
+      "items": { "type": "string" }
+    },
+    "allelicRequirements": {
+      "type": "array",
+      "description": "Inheritance patterns",
+      "items": { "type": "string" }
+    },
+    "ancestry": {
+      "type": "string",
+      "description": "Genetic origin of a population"
+    },
+    "ancestryId": {
+      "type": "string",
+      "description": "Identifier of the ancestry in the HANCESTRO ontology [bioregistry:hancestro]"
+    },
+    "beta": {
+      "type": "number",
+      "description": "Effect size of numberic traits"
+    },
+    "betaConfidenceIntervalLower": {
+      "type": "number",
+      "description": "Lower value of the confidence interval"
+    },
+    "betaConfidenceIntervalUpper": {
+      "type": "number",
+      "description": "Upper value of the confidence interval"
+    },
+    "biologicalModelAllelicComposition": {
+      "type": "string",
+      "description": "Allelic composition of the model organism"
+    },
+    "biologicalModelGeneticBackground": {
+      "type": "string",
+      "description": "Genetic background of the model organism"
+    },
+    "biologicalModelId": {
+      "type": "string",
+      "description": "Identifier of the biological model (eg. in MGI)"
+    },
+    "biomarkerName": {
+      "type": "string",
+      "description": "Altered characteristics that influences the disease process"
+    },
+    "biomarkers": {
+      "type": "object",
+      "description": "List of biomarkers",
+      "properties": {
+        "geneExpression": {
+          "type": "array",
+          "description": "List of gene expression altering biomarkers",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Gene Ontology (GO) identifiers of regulation or background expression processes [bioregistry:go]"
+              },
+              "name": {
+                "type": "string",
+                "description": "Raw gene expression annotation from the source"
+              }
+            }
+          }
+        },
+        "geneticVariation": {
+          "type": "array",
+          "description": "List of gene expression altering biomarkers",
+          "items": {
+            "type": "object",
+            "properties": {
+              "functionalConsequenceId": {
+                "type": "string",
+                "description": "Functional consequene identifier of the variant biomarker [bioregistry:so]"
+              },
+              "id": {
+                "type": "string",
+                "description": "Variant identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the variant biomarker"
+              }
+            }
+          }
+        }
+      }
+    },
+    "biosamplesFromSource": {
+      "type": "array",
+      "description": "Identifier of the referenced biological material",
+      "items": { "type": "string" }
+    },
+    "cellType": {
+      "type": "string",
+      "description": "The studied cell type. Preferably the cell line ontology label"
+    },
+    "clinicalPhase": {
+      "type": "number",
+      "description": "Phase of the clinical trial"
+    },
+    "clinicalSignificances": {
+      "type": "array",
+      "description": "Standard terms to define clinical significance",
+      "items": { "type": "string" }
+    },
+    "clinicalStatus": {
+      "type": "string",
+      "description": "Current stage of a clinical study"
+    },
+    "cohortDescription": {
+      "type": "string",
+      "description": "Description of the studied cohort"
+    },
+    "cohortId": {
+      "type": "string",
+      "description": "Identifier of the studied cohort"
+    },
+    "cohortPhenotypes": {
+      "type": "array",
+      "description": "Clinical features/phenotypes observed in studied individuals",
+      "items": { "type": "string" }
+    },
+    "cohortShortName": {
+      "type": "string",
+      "description": "Short name of the studied cohort"
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Confidence qualifier on the reported evidence"
+    },
+    "contrast": {
+      "type": "string",
+      "description": "Experiment contrast"
+    },
+    "crisprScreenLibrary": {
+      "type": "string",
+      "description": "The applied screening library in the CRISPR/CAS9 project"
+    },
+    "datatypeId": {
+      "type": "string",
+      "description": "Type of the evidence"
+    },
+    "diseaseCellLines": {
+      "type": "array",
+      "description": "Cancer cell lines used to generate evidence",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Cell type identifier in cell ontology or in cell model database" },
+          "name": { "type": "string", "description": "Name of the cell model" },
+          "tissue": { "type": "string", "description": "Name of the tissue from which the cells were sampled" },
+          "tissueId": { "type": "string", "description": "Anatomical identifier of the sampled organ/tissue [bioregistry:uberon]" }
+        }
+      }
+    },
+    "diseaseFromSource": {
+      "type": "string",
+      "description": "Disease label from the original source"
+    },
+    "diseaseFromSourceId": {
+      "type": "string",
+      "description": "Disease identifier from the original source"
+    },
+    "diseaseFromSourceMappedId": {
+      "type": "string",
+      "description": "Mapped Open Targets disease identifier"
+    },
+    "diseaseModelAssociatedHumanPhenotypes": {
+      "type": "array",
+      "description": "Human phenotypes equivalent to those observed in animal models",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Human phenotype ontology identifier [bioregistry:hp]" },
+          "label": { "type": "string", "description": "Human phenotype ontology label" }
+        }
+      }
+    },
+    "diseaseModelAssociatedModelPhenotypes": {
+      "type": "array",
+      "description": "Phenotypes observed in genetically-modified animal models",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Mouse phenotype ontology identifier [bioregistry:mp]" },
+          "label": { "type": "string", "description": "Mouse phenotype ontology label" }
+        }
+      }
+    },
+    "drugFromSource": {
+      "type": "string",
+      "description": "Drug name/family in resource of origin"
+    },
+    "drugId": {
+      "type": "string",
+      "description": "Open Targets drug identifier [bioregistry:chembl]"
+    },
+    "drugResponse": {
+      "type": "string",
+      "description": "Observed patterns of drug response"
+    },
+    "geneticBackground": {
+      "type": "string",
+      "description": "Additional genetic background of the applied cell line in the CRISPR screen"
+    },
+    "literature": {
+      "type": "array",
+      "description": "List of PubMed or preprint reference identifiers",
+      "items": { "type": "string" }
+    },
+    "log2FoldChangePercentileRank": {
+      "type": "number",
+      "description": "Percentile of top differentially regulated genes (transcripts) within experiment"
+    },
+    "log2FoldChangeValue": {
+      "type": "number",
+      "description": "Log2 fold expression change in contrast experiment"
+    },
+    "mutatedSamples": {
+      "type": "array",
+      "description": "Samples with a given mutation tested",
+      "items": {
+        "type": "object",
+        "properties": {
+          "functionalConsequenceId": { "type": "string", "description": "Functional consequene identifier of the pooled mutations [bioregistry:so]" },
+          "numberMutatedSamples": { "type": "number", "description": "Number of cohort samples in which target is mutated with a mutation of any type" },
+          "numberSamplesTested": { "type": "number", "description": "Number of cohort samples tested" },
+          "numberSamplesWithMutationType": { "type": "number", "description": "Number of cohort samples in which target is mutated with a specific mutation type" }
+        }
+      }
+    },
+    "oddsRatio": {
+      "type": "number",
+      "description": "Size of effect captured as odds ratio"
+    },
+    "oddsRatioConfidenceIntervalLower": {
+      "type": "number",
+      "description": "Lower value of the confidence interval for odds ratio"
+    },
+    "oddsRatioConfidenceIntervalUpper": {
+      "type": "number",
+      "description": "Upper value of the confidence interval for odds ratio"
+    },
+    "pValueExponent": {
+      "type": "number",
+      "description": "Exponent of the p-value"
+    },
+    "pValueMantissa": {
+      "type": "number",
+      "description": "Mantissa of the p-value"
+    },
+    "pathways": {
+      "type": "array",
+      "description": "List of pooled pathways",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Reactome pathway identifier [bioregistry:reactome]" },
+          "name": { "type": "string", "description": "Pathway or gene set/pathway name" }
+        }
+      }
+    },
+    "projectId": {
+      "type": "string",
+      "description": "The identifer of the project that generated the data"
+    },
+    "reactionId": {
+      "type": "string",
+      "description": "Pathway, gene set or reaction identifier in Reactome"
+    },
+    "reactionName": {
+      "type": "string",
+      "description": "Name of the reaction, patway or gene set in Reactome"
+    },
+    "releaseDate": {
+      "type": "string",
+      "description": "Date of the release of the data in a 'YYYY-MM-DD' format"
+    },
+    "releaseVersion": {
+      "type": "string",
+      "description": "Open Targets data release version"
+    },
+    "resourceScore": {
+      "type": "number",
+      "description": "Score provided by datasource indicating strength of target-disease association"
+    },
+    "sex": {
+      "type": "array",
+      "description": "Sex of the samples/population included in the analysis",
+      "items": { "type": "string" }
+    },
+    "significantDriverMethods": {
+      "type": "array",
+      "description": "Methods to detect cancer driver genes producing significant results",
+      "items": { "type": "string" }
+    },
+    "statisticalMethod": {
+      "type": "string",
+      "description": "The statistical method used to calculate the association"
+    },
+    "statisticalMethodOverview": {
+      "type": "string",
+      "description": "Overview of the statistical method used to calculate the association"
+    },
+    "statisticalTestTail": {
+      "type": "string",
+      "description": "End of the distribution the target was picked from"
+    },
+    "studyCases": {
+      "type": "number",
+      "description": "Number of cases in case-control study"
+    },
+    "studyCasesWithQualifyingVariants": {
+      "type": "number",
+      "description": "Number of cases in case-control study that carry at least one allele of the qualifying variant"
+    },
+    "studyId": {
+      "type": "string",
+      "description": "Identifier of the study generating the data"
+    },
+    "studyOverview": {
+      "type": "string",
+      "description": "Description of the study"
+    },
+    "studySampleSize": {
+      "type": "number",
+      "description": "Sample size of study"
+    },
+    "studyStartDate": {
+      "type": "string",
+      "description": "Start date of study in a YYYY-MM-DD format"
+    },
+    "studyStopReason": {
+      "type": "string",
+      "description": "Reason why a study has been stopped"
+    },
+    "studyStopReasonCategories": {
+      "type": "array",
+      "description": "Predicted reason(s) why the study has been stopped based on studyStopReason",
+      "items": { "type": "string" }
+    },
+    "targetFromSource": {
+      "type": "string",
+      "description": "Target name/synonym or non HGNC symbol in resource of origin"
+    },
+    "targetFromSourceId": {
+      "type": "string",
+      "description": "Target ID in resource of origin (accepted sources include Ensembl gene ID, Uniprot ID, gene symbol), only capital letters are accepted"
+    },
+    "targetInModel": {
+      "type": "string",
+      "description": "Target name/synonym in animal model"
+    },
+    "targetInModelEnsemblId": {
+      "type": "string",
+      "description": "Target Ensembl ID in animal model [bioregistry:ensembl]"
+    },
+    "targetInModelMgiId": {
+      "type": "string",
+      "description": "Target MGI ID in animal model [bioregistry:mgi]"
+    },
+    "targetModulation": {
+      "type": "string",
+      "description": "Description of target modulation event"
+    },
+    "urls": {
+      "type": "array",
+      "description": "Reference to linked external resource (e.g. clinical trials, studies, package inserts, reports, etc.)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "niceName": { "type": "string", "description": "Human readable label of the remote reference" },
+          "url": { "type": "string", "description": "URL to remote resource" }
+        }
+      }
+    },
+    "variantAminoacidDescriptions": {
+      "type": "array",
+      "description": "Descriptions of variant consequences at protein level",
+      "items": { "type": "string" }
+    },
+    "variantFromSourceId": {
+      "type": "string",
+      "description": "Identifier of the disease-causing variant at source"
+    },
+    "variantFunctionalConsequenceId": {
+      "type": "string",
+      "description": "Sequence ontology (SO) identifier of the functional consequence of the variant [bioregistry:so]"
+    },
+    "variantHgvsId": {
+      "type": "string",
+      "description": "Identifier in HGVS notation of the disease-causing variant"
+    },
+    "variantId": {
+      "type": "string",
+      "description": "Identifier in CHROM_POS_REF_ALT notation of the disease-causing variant"
+    },
+    "variantRsId": {
+      "type": "string",
+      "description": "Variant reference SNP cluster ID (Rsid)"
+    },
+    "pmcIds": {
+      "type": "array",
+      "description": "List of PubMed Central identifiers of full text publication",
+      "items": { "type": "string" }
+    },
+    "publicationYear": {
+      "type": "number",
+      "description": "Year of publication"
+    },
+    "studyLocusId": {
+      "type": "string",
+      "description": "Identifier of the Open Targets Study Locus"
+    },
+    "textMiningSentences": {
+      "type": "array",
+      "description": "Sentences of a publication supporting the disease/target relationship",
+      "items": {
+        "type": "object",
+        "properties": {
+          "dEnd": { "type": "number", "description": "End position of the disease label in sentence" },
+          "dStart": { "type": "number", "description": "Start position of the disease label in the sentence" },
+          "section": { "type": "string", "description": "Section of the publication the sentence was extracted from" },
+          "tEnd": { "type": "number", "description": "End position of the target label in the sentence" },
+          "tStart": { "type": "number", "description": "Start position of the target label in the sentence" },
+          "text": { "type": "string", "description": "Text of the sentence with the disease/target relationship" }
+        }
+      }
+    },
+    "diseaseId": {
+      "type": "string",
+      "description": "Open Targets disease identifier"
+    },
+    "id": {
+      "type": "string",
+      "description": "Identifer of the disease/target evidence"
+    },
+    "score": {
+      "type": "number",
+      "description": "Score of the evidence reflecting the strength of the disease/target relationship"
+    },
+    "variantEffect": {
+      "type": "string",
+      "description": "Gain or loss of function annotation of the variant effect"
+    },
+    "directionOnTrait": {
+      "type": "string",
+      "description": "Predicted direction of effect on the trait"
+    },
+    "sourceId": {
+      "type": "string",
+      "description": "Identifer of the evidence source"
+    }
+  },
+  "reactome_pathway": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the Reactome pathway [bioregistry:reactome]"
+    },
+    "label": {
+      "type": "string",
+      "description": "Name or label of the pathway"
+    },
+    "ancestors": {
+      "type": "array",
+      "description": "List of ancestor pathways in the ontology",
+      "items": { "type": "string" }
+    },
+    "descendants": {
+      "type": "array",
+      "description": "List of descendant pathways in the ontology",
+      "items": { "type": "string" }
+    },
+    "children": {
+      "type": "array",
+      "description": "Direct child pathways of the current pathway",
+      "items": { "type": "string" }
+    },
+    "parents": {
+      "type": "array",
+      "description": "Direct parent pathways of the current pathway",
+      "items": { "type": "string" }
+    },
+    "path": {
+      "type": "array",
+      "description": "Hierarchical path representing the position of the pathway in Reactome",
+      "items": { "type": "string" }
+    }
+  },
+  "go_term": {
+    "id": {
+      "type": "string",
+      "description": "Gene ontology term identifier [bioregistry:go]"
+    },
+    "name": {
+      "type": "string",
+      "description": "Gene ontology term name"
+    }
+  },
+  "target_matrix": {
+    "targetId": { "type": "string", "description": "Unique identifier for the target, typically an Ensembl gene ID." },
+    "isInMembrane": { "type": "integer", "description": "Indicates if the target protein is located in the cell or plasma membrane." },
+    "isSecreted": { "type": "integer", "description": "Indicates if the target protein is secreted or predicted to be secreted." },
+    "hasSafetyEvent": { "type": "integer", "description": "Indicates if there are known safety events associated with the target." },
+    "hasPocket": { "type": "integer", "description": "Indicates if the target has predicted binding pockets suitable for small molecule binding." },
+    "hasLigand": { "type": "integer", "description": "Indicates if the target binds at least one high-quality ligand." },
+    "hasSmallMoleculeBinder": { "type": "integer", "description": "Indicates if the target has at least one small molecule binder." },
+    "geneticConstraint": { "type": "number", "description": "Represents the genetic constraint of the target, indicating how intolerant it is to genetic variation." },
+    "paralogMaxIdentityPercentage": { "type": "number", "description": "Maximum percentage identity among the target's paralogous genes." },
+    "mouseOrthologMaxIdentityPercentage": { "type": "number", "description": "Maximum percentage identity between the target and its mouse ortholog." },
+    "isCancerDriverGene": { "type": "integer", "description": "Indicates if the target is identified as a cancer driver gene." },
+    "hasTEP": { "type": "integer", "description": "Indicates if a Target Enabling Package (TEP) is available for the target." },
+    "mouseKOScore": { "type": "number", "description": "Represents the phenotypic score from mouse knockout models for the target." },
+    "hasHighQualityChemicalProbes": { "type": "integer", "description": "Indicates if there are high-quality chemical probes available for the target." },
+    "maxClinicalTrialPhase": { "type": "number", "description": "Highest clinical trial phase that the target has reached for any indication." },
+    "tissueSpecificity": { "type": "number", "description": "Describes the specificity of the target's expression across different tissues." },
+    "tissueDistribution": { "type": "number", "description": "Describes the distribution pattern of the target's expression in various tissues." }
+  },
+  "variant": {
+    "variantId": {
+      "type": "string",
+      "description": "The unique identifier for the variant following schema: {chromosome}-{position}-{referenceAllele}-{alternateAllele}"
+    },
+    "chromosome": {
+      "type": "string",
+      "description": "The chromosome on which the variant is located"
+    },
+    "position": {
+      "type": "integer",
+      "description": "The position on the chromosome of the variant"
+    },
+    "referenceAllele": {
+      "type": "string",
+      "description": "The reference allele for the variant"
+    },
+    "alternateAllele": {
+      "type": "string",
+      "description": "The alternate allele for the variant"
+    },
+    "variantEffect": {
+      "type": "array",
+      "description": "List predicted or measured effect of the variant based on various methods",
+      "items": {
+        "type": "object",
+        "properties": {
+          "method": { "type": "string", "description": "The method name used to predict the effect of the variant" },
+          "assessment": { "type": "string", "description": "Textual assessment of the variant effect" },
+          "score": { "type": "number", "description": "The score of the variant effect" },
+          "assessmentFlag": { "type": "string", "description": "Flagging if the variant effect is considered pathogenic" },
+          "targetId": { "type": "string", "description": "The target identifier on which the variant effect is interpreted [bioregistry:ensembl]" },
+          "normalisedScore": { "type": "number", "description": "Variant effect normalised between -1 and 1" }
+        }
+      }
+    },
+    "mostSevereConsequenceId": {
+      "type": "string",
+      "description": "The sequence ontology identifier of the most severe consequence of the variant based on Ensembl VEP [bioregistry:so]"
+    },
+    "transcriptConsequences": {
+      "type": "array",
+      "description": "Predicted consequences on transcript context",
+      "items": {
+        "type": "object",
+        "properties": {
+          "variantFunctionalConsequenceIds": {
+            "type": "array",
+            "description": "The sequence ontology identifier of the consequence of the variant based on Ensembl VEP in the context of the transcript [bioregistry:so]",
+            "items": { "type": "string" }
+          },
+          "aminoAcidChange": { "type": "string", "description": "The amino acide change caused by this variant on this gene" },
+          "uniprotAccessions": {
+            "type": "array",
+            "description": "List of Uniprot identifiers of the gene product [bioregistry:uniprot]",
+            "items": { "type": "string" }
+          },
+          "isEnsemblCanonical": { "type": "boolean", "description": "Flagging if the transcript is the canonical transcript for the gene" },
+          "codons": { "type": "string", "description": "The affected codon in the transcript" },
+          "distanceFromFootprint": { "type": "number", "description": "The distance of the variant from the transcript" },
+          "distanceFromTss": { "type": "number", "description": "The distance of the variant from the transcription start site" },
+          "appris": { "type": "string", "description": "The appris annotation of the transcript" },
+          "maneSelect": { "type": "string", "description": "MANE annotation of the transcript" },
+          "targetId": { "type": "string", "description": "Open Target target identifier of the transcript [bioregistry:ensembl]" },
+          "impact": { "type": "string", "description": "Ensembl VEP predicted impact of the variant on the transcript" },
+          "lofteePrediction": { "type": "string", "description": "Loss of function prediction based on LOFTEE" },
+          "siftPrediction": { "type": "number", "description": "SIFT prediction of the variant impact on the transcript" },
+          "polyphenPrediction": { "type": "number", "description": "Polyphen prediction of the variant impact on the transcript" },
+          "consequenceScore": { "type": "number", "description": "Score assigned to transcript based on Ensembl VEP consequence" },
+          "transcriptIndex": { "type": "integer", "description": "The index of the transcript in the list of transcripts around the gene" },
+          "approvedSymbol": { "type": "string", "description": "The HGNC gene symbol of the gene" },
+          "biotype": { "type": "string", "description": "Biotype of the transcript" },
+          "transcriptId": { "type": "string", "description": "The Ensembl transcript identifier [bioregistry:ensembl]" }
+        }
+      }
+    },
+    "rsIds": {
+      "type": "array",
+      "description": "The list of rsIds for the variant",
+      "items": { "type": "string" }
+    },
+    "hgvsId": {
+      "type": "string",
+      "description": "HGVS identifier of the variant"
+    },
+    "alleleFrequencies": {
+      "type": "array",
+      "description": "The allele frequencies of the variant in different populations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "populationName": { "type": "string", "description": "Name of the population" },
+          "alleleFrequency": { "type": "number", "description": "The frequency of the alternate allele in the population" }
+        }
+      }
+    },
+    "dbXrefs": {
+      "type": "array",
+      "description": "The list of cross-references for the variant in different databases",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Identifier of the variant in the given database" },
+          "source": { "type": "string", "description": "Name of the database the variant is referenced in" }
+        }
+      }
+    },
+    "variantDescription": {
+      "type": "string",
+      "description": "Short summary of the variant effect"
+    }
+  }
+
+}

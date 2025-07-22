@@ -45,13 +45,17 @@ class KnowledgeGraphBuilder:
             return {}
 
     def _add_node(self, node_id: str, node_type: str, **properties):
+        # Deduplicate properties by normalized key (Cypher is case-insensitive)
+        clean_props = _clean_dupe_keys(properties, node_id=node_id, context="Node")
         if not self.graph.has_node(node_id):
-            self.graph.add_node(node_id, type=node_type, **properties)
+            self.graph.add_node(node_id, type=node_type, **clean_props)
             self.node_types[node_type] = self.node_types.get(node_type, 0) + 1
 
     def _add_edge(self, source: str, target: str, edge_type: str, **properties):
-        self.graph.add_edge(source, target, key=edge_type, type=edge_type, **properties)
+        clean_props = _clean_dupe_keys(properties, node_id=f"{source}->{target}", context="Edge")
+        self.graph.add_edge(source, target, key=edge_type, type=edge_type, **clean_props)
         self.edge_types[edge_type] = self.edge_types.get(edge_type, 0) + 1
+
 
     def build_graph_from_drugbank(self, drugbank_data: List[Dict[str, Any]]):
         self.logger.info(f"Adding {len(drugbank_data)} drugs and their relationships from DrugBank.")
@@ -177,6 +181,26 @@ class KnowledgeGraphBuilder:
             largest_cc = max(nx.connected_components(self.graph.to_undirected()), key=len)
             stats["largest_component_size"] = len(largest_cc)
         return stats
+
+def _clean_dupe_keys(properties: dict, node_id:str = None, context:str = "") -> dict:
+        """Ensure no duplicate keys for Cypher/Memgraph import (case-insensitive!)"""
+        seen = set()
+        new_props = {}
+        dups = set()
+        # If properties come from a merge of multiple dicts, keys might collide
+        for k, v in properties.items():
+            k_norm = k.lower()
+            if k_norm in seen:
+                dups.add(k)
+            else:
+                seen.add(k_norm)
+                new_props[k] = v
+        if dups:
+            import logging
+            logging.getLogger("dupe_clean").warning(
+                f"[Dupe WARNING] {context} {node_id} duplicate keys ignored: {dups}"
+            )
+        return new_props
 
 def load_data(file_path: str):
     logger = logging.getLogger("load_data")

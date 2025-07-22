@@ -59,16 +59,12 @@ def load_data(file_path: str) -> Any:
 
 # --- Replace the existing main function with this one ---
 def main():
-    parser = argparse.ArgumentParser(description="Build integrated knowledge graph")
+    parser = argparse.ArgumentParser(description="Build integrated knowledge graph (comprehensive version)")
     parser.add_argument("--drugbank", required=True, help="Path to processed DrugBank data")
-    # --- Corrected Arguments ---
     parser.add_argument("--mesh", required=True, help="Path to processed MeSH disease data (e.g., mesh_data_2025.pickle)")
     parser.add_argument("--opentargets_td_assoc", required=True, help="Path to processed OpenTargets target-disease associations")
-    parser.add_argument("--disease_mapping", required=True, help="Path to the precomputed disease mapping JSON file (EFO/MONDO -> MeSH)")
-    # --- End Corrected Arguments ---
-    # Optional arguments for other associations if needed later
-    # parser.add_argument("--indications", help="Path to drug-disease indications file (optional)")
-    # parser.add_argument("--ot_dt_assoc", help="Path to OpenTargets drug-target associations (optional)")
+    parser.add_argument("--disease_mapping", required=True, help="Path to precomputed disease mapping JSON file (EFO/MONDO -> MeSH)")
+    parser.add_argument("--protein_mapping", required=True, help="Path to protein mapping CSV file (Ensembl -> UniProt)")
     parser.add_argument("--output", required=True, help="Output directory for graph")
     parser.add_argument("--log_file", help="Path to log file")
     parser.add_argument("--formats", default="graphml,pickle", help="Comma-separated list of output formats (pyg optional)")
@@ -76,29 +72,27 @@ def main():
 
     # Set up logging using the utility function if available, otherwise basic config
     try:
-        # Assuming setup_logging is correctly imported or defined elsewhere
-        # If not, use basicConfig as fallback
         from ddi.utils.logging import setup_logging
         setup_logging(args.log_file, level=logging.INFO)
     except ImportError:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
         if args.log_file:
-             # Ensure log directory exists
-             log_dir = os.path.dirname(args.log_file)
-             if log_dir: os.makedirs(log_dir, exist_ok=True)
-             # Add file handler
-             file_handler = logging.FileHandler(args.log_file)
-             file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt="%Y-%m-%d %H:%M:%S"))
-             logging.getLogger().addHandler(file_handler)
+            log_dir = os.path.dirname(args.log_file)
+            if log_dir: os.makedirs(log_dir, exist_ok=True)
+            file_handler = logging.FileHandler(args.log_file)
+            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt="%Y-%m-%d %H:%M:%S"))
+            logging.getLogger().addHandler(file_handler)
 
     logger = logging.getLogger("build_graph")
 
-    logger.info("Starting knowledge graph construction with ID mapping")
+    logger.info("Starting knowledge graph construction with all mappings")
 
-    # Initialize graph builder WITH mapping
-    # Assuming KnowledgeGraphBuilder is correctly imported or defined elsewhere
-    # from ddi.graph.builder import KnowledgeGraphBuilder # Make sure this import is present at the top
-    graph_builder = KnowledgeGraphBuilder(output_dir=args.output, disease_mapping_path=args.disease_mapping)
+    # Initialize graph builder WITH all mappings/support
+    graph_builder = KnowledgeGraphBuilder(
+        output_dir=args.output,
+        disease_mapping_path=args.disease_mapping,
+        protein_mapping_path=args.protein_mapping
+    )
 
     # Load and add DrugBank data
     logger.info(f"Loading DrugBank data from {args.drugbank}")
@@ -122,7 +116,10 @@ def main():
     logger.info(f"Loading OpenTargets target-disease associations from {args.opentargets_td_assoc}")
     ot_td_associations = load_data(args.opentargets_td_assoc)
     if ot_td_associations is not None: # Check for None, allow empty list
-        graph_builder.add_target_disease_associations(ot_td_associations) # This method now uses the mapping
+        import pandas as pd
+        # Defensive: wrap as DataFrame for compatibility with .iterrows()
+        ot_df = pd.DataFrame(ot_td_associations)
+        graph_builder.add_target_disease_associations(ot_df) # This method now uses the mapping
     else:
         logger.warning("Failed to load OpenTargets associations. Continuing without them.")
 
