@@ -64,7 +64,7 @@ ORDER BY connectivity_level;
 // 5. ORPHAN NODE DETECTION
 // Find nodes with no connections
 MATCH (n)
-WHERE NOT (n)-[]-()
+WHERE NOT EXISTS((n)-[]-())
 RETURN labels(n)[0] AS node_type, count(*) AS orphan_count;
 
 // 6. ENHANCED DATA QUALITY CHECKS
@@ -113,7 +113,7 @@ MATCH path = (d:Drug)-[:TARGETS]->(t:Target)-[:INVOLVED_IN]->(p:Pathway)-[:ASSOC
 RETURN 'Complete 4-hop paths' AS metric, count(*) AS count
 UNION
 MATCH (d:Drug)-[:TARGETS]->(t:Target)
-WHERE NOT (t)-[:INVOLVED_IN]->(:Pathway)
+WHERE NOT EXISTS((t)-[:INVOLVED_IN]->(:Pathway))
 RETURN 'Drug-Target pairs without pathway info' AS metric, count(*) AS count
 UNION
 MATCH (d:Drug)-[:INDICATED_FOR]->(dis:Disease)
@@ -173,7 +173,7 @@ RETURN d.name AS drug,
        t.symbol AS target, 
        p.name AS pathway, 
        dis.name AS disease,
-       length(path) AS path_length
+       size(relationships(path)) AS path_length
 LIMIT 5;
 
 // Test drug indication analysis: "What drugs are indicated for cancer with high clinical phases?"
