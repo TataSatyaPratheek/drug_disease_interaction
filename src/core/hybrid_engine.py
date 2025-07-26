@@ -1,3 +1,4 @@
+from sentence_transformers import CrossEncoder
 # src/core/hybrid_engine.py - USE LLAMAINDEX QUERY ENGINE PATTERN
 
 from llama_index.core.query_engine import BaseQueryEngine
@@ -30,8 +31,9 @@ class HybridRAGEngine(BaseQueryEngine):
         self.weaviate = weaviate_service
         self.llm = llm_service
         self.config = config
-        # Call parent __init__ to set up callback_manager and other essentials
         super().__init__(callback_manager=kwargs.get("callback_manager"), **kwargs)
+        # Initialize a lightweight reranker model
+        self.reranker = CrossEncoder('ms-marco-MiniLM-L-6-v2')
 
     def _query(self, query_bundle: QueryBundle) -> Response:
         """Sync query method. Standard practice is to wrap the async version."""
@@ -74,33 +76,45 @@ class HybridRAGEngine(BaseQueryEngine):
         if isinstance(results[1], Exception):
             logger.error(f"Vector search failed: {results[1]}")
 
-        return self._merge_and_rerank(graph_results, vector_results)
+        # Pass the query to the merge function for reranking
+        return self._merge_and_rerank(query, graph_results, vector_results)
 
-    def _merge_and_rerank(self, graph_results: List, vector_results: List) -> List[Dict]:
+    def _merge_and_rerank(self, query: str, graph_results: List, vector_results: List) -> List[Dict]:
         """
-        Merges results, normalizes scores, and re-ranks.
-        This is a simple example; a real implementation might use a more advanced re-ranking model.
+        Merges results and uses a CrossEncoder to rerank for relevance.
         """
-        merged = []
+        all_candidates = []
 
-        # Normalize Weaviate scores (assuming they are between 0 and 1)
-        for result in vector_results:
-            result['normalized_score'] = result.get('score', 0.0)
-            merged.append(result)
+        # Prepare Weaviate results
+        for res in vector_results:
+            all_candidates.append({
+                "text": f"{res.get('name', '')}: {res.get('description', '')}",
+                "original_result": res
+            })
 
-        # Assign a high base score to graph results and add them
-        graph_base_score = 0.8
-        for result in graph_results:
-            # Create a unique ID for the path to avoid duplicates
-            path_id = "-".join(sorted([node['id'] for node in result.get('node_details', [])]))
-            if not any(item.get('id') == path_id for item in merged):
-                merged.append({
-                    'id': path_id,
-                    'name': f"Interaction Path: {result['node_details'][0]['name']} to {result['node_details'][-1]['name']}",
-                    'normalized_score': graph_base_score,
-                    'metadata': result,
-                    'source': 'neo4j'
-                })
+        # Prepare Neo4j path results
+        for res in graph_results:
+            path_text = " -> ".join([node['name'] for node in res.get('node_details', [])])
+            all_candidates.append({
+                "text": f"Graph Path: {path_text}",
+                "original_result": res
+            })
 
-        # Sort by the new normalized score
-        return sorted(merged, key=lambda x: x['normalized_score'], reverse=True)[:20]
+        if not all_candidates:
+            return []
+
+        # Create pairs of [query, passage] for the reranker
+        rerank_pairs = [[query, candidate['text']] for candidate in all_candidates]
+
+        # Predict relevance scores
+        scores = self.reranker.predict(rerank_pairs)
+
+        # Add scores to the original results and sort
+        for i, candidate in enumerate(all_candidates):
+            candidate['original_result']['rerank_score'] = scores[i]
+        reranked_results = sorted(
+            [candidate['original_result'] for candidate in all_candidates],
+            key=lambda x: x['rerank_score'],
+            reverse=True
+        )
+        return reranked_results[:20]

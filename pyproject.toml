@@ -55,6 +55,8 @@ dependencies = [
     "weaviate-client==4.8.0",
     "neo4j>=5.28.1",
     "pytest>=8.3.5",
+    "redis>=6.1.1",
+    "fastapi-cache2>=0.2.2",
 ]
 
 [project.optional-dependencies]

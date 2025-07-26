@@ -37,7 +37,6 @@ services:
       DEFAULT_VECTORIZER_MODULE: 'none'
       CLUSTER_HOSTNAME: 'node1'
     volumes:
-      # ✅ FIXED: Use host path mount instead of named volume
       - ../data/databases/vector:/var/lib/weaviate
     restart: unless-stopped
     healthcheck:
@@ -57,7 +56,6 @@ services:
       - "7474:7474"
       - "7687:7687"
     volumes:
-      # ✅ Your existing Neo4j path (already correct)
       - ../data/databases/neo4j:/data
     restart: unless-stopped
 
@@ -66,7 +64,6 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      # ✅ Keep Ollama as named volume (models are large and portable)
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_GPU_LAYERS=32
@@ -77,6 +74,11 @@ services:
       timeout: 10s
       retries: 3
 
-# ✅ UPDATED: Removed weaviate_data since we use host mount now
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
 volumes:
   ollama_data:

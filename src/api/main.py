@@ -1,3 +1,7 @@
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+from redis import asyncio as aioredis
 # src/api/main.py - USE FASTAPI (DON'T REINVENT WEB FRAMEWORK)
 
 # src/api/main.py - UPDATED
@@ -27,7 +31,11 @@ async def lifespan(app: FastAPI):
     """Application lifespan management with dependency injection"""
     # Startup
     logger.info("🚀 Starting Hybrid RAG API...")
-    
+
+    # Initialize Redis and FastAPI Cache on startup
+    redis_client = aioredis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
+    FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache")
+
     try:
         # Initialize services
         neo4j_service = Neo4jService(
@@ -36,21 +44,21 @@ async def lifespan(app: FastAPI):
             settings.database.neo4j_password,
             max_workers=settings.hardware['threading_config']['max_workers']
         )
-        
+
         weaviate_service = WeaviateService(settings.database.weaviate_url)
         llm_service = LLMService(settings.hardware)
-        
+
         hybrid_engine = HybridRAGEngine(
             neo4j_service, weaviate_service, llm_service, settings.hardware
         )
-        
+
         # Set services for dependency injection
         set_services(neo4j_service, weaviate_service, llm_service, hybrid_engine)
-        
+
         logger.info("✅ All services initialized successfully")
-        
+
         yield
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         raise

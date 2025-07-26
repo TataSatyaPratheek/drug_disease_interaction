@@ -18,7 +18,7 @@ async def health_check(
 ):
     """Checks the status of all downstream services."""
     start_time = time.time()
-    
+
     async def check_neo4j():
         try:
             await neo4j.driver.verify_connectivity()
@@ -32,23 +32,35 @@ async def health_check(
     async def check_ollama():
         return "ok" if await llm.check_connection() else "error"
 
+    # Run health checks concurrently
     results = await asyncio.gather(check_neo4j(), check_weaviate(), check_ollama())
-    
+
     services_status = {
         "neo4j": results[0],
         "weaviate": results[1],
         "ollama": results[2]
     }
-    
+
+    # Fetch stats concurrently
+    neo4j_stats_task = neo4j.get_db_stats()
+    weaviate_stats_task = weaviate.get_db_stats()
+    neo4j_stats, weaviate_stats = await asyncio.gather(neo4j_stats_task, weaviate_stats_task)
+
+    database_stats = {
+        "neo4j": neo4j_stats,
+        "weaviate": weaviate_stats,
+        "response_time_ms": (time.time() - start_time) * 1000,
+    }
+
     overall_status = "healthy" if all(s == "ok" for s in services_status.values()) else "degraded"
-    
+
     if overall_status == "degraded":
         raise HTTPException(status_code=503, detail={"status": overall_status, "services": services_status})
-    
+
     return HealthResponse(
         status=overall_status,
         services=services_status,
-        database_stats={"response_time_ms": (time.time() - start_time) * 1000}
+        database_stats=database_stats
     )
 
 @router.get("/ready")

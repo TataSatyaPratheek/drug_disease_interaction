@@ -8,6 +8,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Neo4jService:
+
+    async def get_db_stats(self) -> Dict[str, int]:
+        def _sync_get_stats():
+            with self.driver.session() as session:
+                nodes = session.run("MATCH (n) RETURN count(n) as count").single()['count']
+                rels = session.run("MATCH ()-[r]-() RETURN count(r) as count").single()['count']
+            return {"node_count": nodes, "relationship_count": rels}
+        return await asyncio.get_event_loop().run_in_executor(self.executor, _sync_get_stats)
     """Neo4j service using official driver - DON'T REINVENT DATABASE ACCESS"""
     
     def __init__(self, uri: str, user: str, password: str, max_workers: int = 4):

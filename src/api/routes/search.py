@@ -1,10 +1,50 @@
 # src/api/routes/search.py - USE FASTAPI ROUTER
 
 # src/api/routes/search.py - UPDATED
-from fastapi import APIRouter, HTTPException
+
+from fastapi import APIRouter, HTTPException, Depends
 from llama_index.core import QueryBundle
 import time
 import logging
+
+from fastapi_cache.decorator import cache
+from fastapi.responses import StreamingResponse
+
+# ...existing code...
+
+router = APIRouter()
+
+@router.post("/search/stream")
+async def hybrid_search_stream(
+    request: HybridSearchRequest,
+    engine = Depends(HybridEngineDep)
+):
+    """
+    ✅ NEW FEATURE: Performs a hybrid search and streams the LLM's response token-by-token.
+    """
+    try:
+        # Step 1: Retrieve context (this part is not streamed)
+        retrieved_results = await engine._retrieve_async(request.query)
+        context = "\n".join([r.get('name', '') + ": " + r.get('description', '') for r in retrieved_results[:10]])
+
+        # Step 2: Define an async generator for the streaming response
+        async def stream_generator():
+            prompt = f"""
+            Based on the following context, answer the question.
+            Context: {context}
+            Question: {request.query}
+            Answer:"""
+            # Use the streaming method of the LlamaIndex LLM
+            stream = await engine.llm.llm.astream_complete(prompt)
+            async for delta in stream:
+                yield delta.delta
+
+        # Step 3: Return a StreamingResponse
+        return StreamingResponse(stream_generator(), media_type="text/plain")
+
+    except Exception as e:
+        logger.error(f"Streaming search failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Streaming search failed.")
 
 from src.api.models.requests import HybridSearchRequest, EntityDetailsRequest
 from src.api.models.responses import HybridSearchResponse, EntityResult
@@ -16,6 +56,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/search", response_model=HybridSearchResponse)
+@cache(expire=3600)  # Cache results for this endpoint for 1 hour
 async def hybrid_search(
     request: HybridSearchRequest,
     engine: HybridEngineDep

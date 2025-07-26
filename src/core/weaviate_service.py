@@ -7,6 +7,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 class WeaviateService:
+
+    async def get_db_stats(self) -> Dict[str, Any]:
+        stats = {}
+        for col_name in ['Drug', 'Disease', 'Target', 'Pathway']:
+            try:
+                if self.client.collections.exists(col_name):
+                    collection = self.client.collections.get(col_name)
+                    stats[col_name] = {"count": len(collection)}
+            except Exception:
+                stats[col_name] = "error"
+        return {"total_objects_by_collection": stats}
     """Weaviate service using official client - DON'T REINVENT VECTOR SEARCH"""
     
     def __init__(self, url: str):
