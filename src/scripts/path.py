@@ -561,11 +561,189 @@ else:
 # Add drug nodes to main nodes list
 nodes.extend(all_drug_nodes)
 
-logger.info(f"Total nodes created: {len(nodes)}")
-nodes_df = pd.DataFrame(nodes)
-nodes_output_path = os.path.join(OUTPUT_DIR, "nodes.csv")
-nodes_df.to_csv(nodes_output_path, index=False)
-logger.info(f"✓ Saved nodes to: {nodes_output_path}")
+logger.info(f"Total nodes created: {len(nodes)} (before deduplication)")
+
+# Deduplicate nodes - merge entries with same ID but different information
+logger.info("Deduplicating nodes and merging entries with same ID...")
+start_dedup = time.time()
+
+# Group nodes by ID to handle duplicates
+nodes_by_id = defaultdict(list)
+for node in nodes:
+    nodes_by_id[node['id']].append(node)
+
+# Merge duplicate entries for the same ID
+deduplicated_nodes = []
+duplicates_found = 0
+entries_merged = 0
+
+for node_id, node_list in nodes_by_id.items():
+    if len(node_list) == 1:
+        # No duplicates, keep as is
+        deduplicated_nodes.append(node_list[0])
+    else:
+        # Multiple entries for same ID - merge them
+        duplicates_found += 1
+        entries_merged += len(node_list)
+        
+        # Start with the first entry as base
+        merged_node = node_list[0].copy()
+        
+        # Merge information from other entries, preferring non-None/non-empty values
+        for other_node in node_list[1:]:
+            for key, value in other_node.items():
+                if key == 'id' or key == 'type':
+                    continue  # Keep original ID and type
+                
+                current_value = merged_node.get(key)
+                
+                # Use the more informative value (non-None, non-empty, longer text)
+                if value and str(value).strip() and str(value) != 'None':
+                    if not current_value or str(current_value).strip() == '' or str(current_value) == 'None':
+                        merged_node[key] = value
+                    elif isinstance(value, str) and isinstance(current_value, str):
+                        # For string fields, keep the longer/more detailed one
+                        if len(str(value).strip()) > len(str(current_value).strip()):
+                            merged_node[key] = value
+        
+        deduplicated_nodes.append(merged_node)
+
+# Replace original nodes list with deduplicated version
+nodes = deduplicated_nodes
+
+logger.info(f"✓ Deduplication completed:")
+logger.info(f"  - Found {duplicates_found:,} IDs with duplicates")
+logger.info(f"  - Merged {entries_merged:,} entries into {duplicates_found:,} unique nodes")
+logger.info(f"  - Final node count: {len(nodes):,}")
+log_progress("Node deduplication completed", start_dedup)
+
+# Build ID to group mapping for Neo4j admin import
+logger.info("Building ID-to-group mapping for Neo4j admin import...")
+id_to_group = {}
+for node in nodes:
+    id_to_group[node['id']] = node['type']
+logger.info(f"✓ Built ID-to-group mapping with {len(id_to_group)} entries")
+
+# Create nodes CSVs with proper Neo4j admin import formatting
+logger.info("Creating Neo4j admin import formatted node files...")
+nodes_by_type = defaultdict(list)
+
+# Group all nodes by type
+for node in nodes:
+    node_type = node['type']
+    nodes_by_type[node_type].append(node)
+
+# Save separate CSV for each type with import headers
+for node_type, type_nodes in nodes_by_type.items():
+    df = pd.DataFrame(type_nodes)
+    
+    # Convert unhashable types (lists, dicts) to strings before deduplication
+    logger.info(f"Processing {node_type} nodes for deduplication...")
+    
+    # Create a copy for deduplication with all columns as strings
+    df_for_dedup = df.copy()
+    for col in df_for_dedup.columns:
+        def safe_str_convert(x):
+            try:
+                if x is None:
+                    return ''
+                elif pd.isna(x):
+                    return ''
+                elif isinstance(x, (list, tuple)):
+                    return ','.join(map(str, x))
+                elif hasattr(x, '__iter__') and not isinstance(x, str):
+                    # Handle numpy arrays and other iterables
+                    try:
+                        return ','.join(map(str, x))
+                    except:
+                        return str(x)
+                else:
+                    return str(x)
+            except:
+                return str(x)
+        
+        df_for_dedup[col] = df_for_dedup[col].apply(safe_str_convert)
+    
+    # Deduplicate exactly identical rows within each type
+    initial_count = len(df_for_dedup)
+    dedup_indices = df_for_dedup.drop_duplicates().index
+    df = df.loc[dedup_indices]
+    final_count = len(df)
+    
+    if initial_count > final_count:
+        logger.info(f"  Removed {initial_count - final_count:,} exactly identical {node_type} rows")
+    
+    # Clean multiline fields (replace newlines with spaces)
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            # Handle lists by converting to comma-separated strings
+            df[col] = df[col].apply(lambda x: 
+                ','.join(map(str, x)) if isinstance(x, list) else str(x)
+            ).str.replace('\n', ' ', regex=False).str.replace('\r', ' ', regex=False).fillna('')
+        else:
+            df[col] = df[col].fillna('')
+    
+    # Add group suffix to node IDs for Neo4j admin import consistency
+    if 'id' in df.columns:
+        df['id'] = df['id'].astype(str) + f"({node_type})"
+    
+    # Add required import headers - rename existing columns
+    rename_dict = {'id': 'id:ID', 'name': 'name:string'}
+    
+    # Only rename columns that exist
+    if 'description' in df.columns:
+        rename_dict['description'] = 'description:string'
+    if 'data_source' in df.columns:
+        rename_dict['data_source'] = 'data_source:string'
+    
+    df = df.rename(columns=rename_dict)
+    
+    # Add label column
+    df[':LABEL'] = node_type
+    
+    # Ensure required columns exist
+    if 'name:string' not in df.columns:
+        df['name:string'] = ''
+    if 'description:string' not in df.columns:
+        df['description:string'] = ''
+    if 'data_source:string' not in df.columns:
+        df['data_source:string'] = ''
+    
+    # Select relevant columns for each node type
+    base_columns = ['id:ID', ':LABEL', 'name:string', 'data_source:string']
+    
+    # Add type-specific columns
+    if node_type == 'Drug':
+        extra_columns = ['indication:string', 'mechanism_of_action:string', 'synonyms:string', 
+                        'canonical_smiles:string', 'molecular_weight:string', 'state:string']
+    elif node_type == 'Disease':
+        extra_columns = ['mesh_description:string', 'mesh_terms:string']
+    elif node_type == 'Target':
+        extra_columns = ['symbol:string', 'proteinIds:string']
+    elif node_type == 'Pathway':
+        extra_columns = ['description:string', 'source:string']
+    else:
+        extra_columns = []
+    
+    # Ensure all extra columns exist and rename appropriately
+    for col in extra_columns:
+        col_name = col.replace(':string', '')
+        if col_name in df.columns:
+            df = df.rename(columns={col_name: col})
+        else:
+            df[col] = ''
+    
+    # Final column selection - only include columns that actually exist
+    final_columns = []
+    for col in base_columns + extra_columns:
+        if col in df.columns:
+            final_columns.append(col)
+    
+    output_path = os.path.join(OUTPUT_DIR, f"nodes_{node_type.lower()}.csv")
+    df[final_columns].to_csv(output_path, index=False)
+    
+    logger.info(f"✓ Saved {len(df):,} {node_type} nodes to {output_path}")
+
 log_progress("Nodes creation completed", start_nodes)
 
 # Create edges CSV (drug→target→pathway→disease)
@@ -976,23 +1154,205 @@ except Exception as e:
     logger.info("Continuing without pathway→disease edges...")
     gc.collect()
 
-logger.info(f"Total edges created: {len(edges)}")
+logger.info(f"Total edges created: {len(edges)} (before deduplication)")
+
+# Deduplicate edges - remove exactly identical edges
+logger.info("Deduplicating edges...")
+start_edge_dedup = time.time()
+
 edges_df = pd.DataFrame(edges)
+
+# Count before deduplication
+initial_edge_count = len(edges_df)
+
+# Convert any unhashable types to strings for deduplication
+for col in ['evidence']:  # Known columns that might have dicts/lists
+    if col in edges_df.columns:
+        edges_df[col] = edges_df[col].apply(lambda x: str(x) if not pd.isna(x) else '')
+
+# Remove exactly duplicate edges based on source, target, and type
+edges_df = edges_df.drop_duplicates(subset=['source', 'target', 'type'])
+
+final_edge_count = len(edges_df)
+if initial_edge_count > final_edge_count:
+    logger.info(f"✓ Removed {initial_edge_count - final_edge_count:,} duplicate edges")
+    logger.info(f"✓ Final edge count: {final_edge_count:,}")
+
+# Remove orphaned edges - STREAMING VERSION to prevent memory overload
+logger.info("Removing orphaned edges (edges referencing missing nodes) - STREAMING...")
+start_orphan_removal = time.time()
+
+# Get all valid node IDs from our deduplicated nodes
+valid_node_ids = set(id_to_group.keys())
+logger.info(f"Valid node IDs: {len(valid_node_ids):,}")
+
+# STREAMING APPROACH: Process edges in chunks to prevent memory issues
+chunk_size = 50000  # Process 50k edges at a time
+total_edges = len(edges_df)
+valid_edges = []
+orphaned_count = 0
+
+logger.info(f"Processing {total_edges:,} edges in chunks of {chunk_size:,}...")
+
+for i in range(0, total_edges, chunk_size):
+    end_idx = min(i + chunk_size, total_edges)
+    chunk = edges_df.iloc[i:end_idx].copy()
+    
+    # Filter valid edges in this chunk
+    valid_mask = (chunk['source'].isin(valid_node_ids)) & (chunk['target'].isin(valid_node_ids))
+    valid_chunk = chunk[valid_mask]
+    orphaned_in_chunk = len(chunk) - len(valid_chunk)
+    
+    valid_edges.append(valid_chunk)
+    orphaned_count += orphaned_in_chunk
+    
+    # Progress logging
+    chunk_num = (i // chunk_size) + 1
+    total_chunks = (total_edges + chunk_size - 1) // chunk_size
+    if chunk_num % 10 == 0 or chunk_num == total_chunks:
+        logger.info(f"  Processed chunk {chunk_num}/{total_chunks} (removed {orphaned_count:,} orphaned edges so far)")
+    
+    # Memory cleanup
+    del chunk
+    if chunk_num % 20 == 0:
+        gc.collect()
+
+# Combine all valid edges
+logger.info("Combining valid edge chunks...")
+edges_df = pd.concat(valid_edges, ignore_index=True)
+del valid_edges
+gc.collect()
+
+logger.info(f"✓ Removed {orphaned_count:,} orphaned edges referencing missing nodes")
+logger.info(f"✓ Final edge count after orphan removal: {len(edges_df):,}")
+log_progress("Orphaned edge removal completed", start_orphan_removal)
+
+# Create edges CSV with proper Neo4j admin import formatting
+logger.info("Creating Neo4j admin import formatted edges file...")
+# edges_df already created above
+
+# Clean multiline fields
+for col in edges_df.columns:
+    if edges_df[col].dtype == 'object':
+        edges_df[col] = edges_df[col].astype(str).str.replace('\n', ' ', regex=False).str.replace('\r', ' ', regex=False).fillna('')
+    else:
+        edges_df[col] = edges_df[col].fillna('')
+
+# Add group suffixes to IDs using the mapping we built - STREAMING VERSION
+logger.info("Adding group suffixes to edge IDs (streaming)...")
+start_suffix = time.time()
+
+missing_source = 0
+missing_target = 0
+total_edges = len(edges_df)
+chunk_size = 50000  # Process 50k edges at a time
+
+logger.info(f"Processing {total_edges:,} edges for group suffixes in chunks of {chunk_size:,}...")
+
+for i in range(0, total_edges, chunk_size):
+    end_idx = min(i + chunk_size, total_edges)
+    
+    # Process chunk
+    for idx in range(i, end_idx):
+        source_id = edges_df.iloc[idx]['source']
+        target_id = edges_df.iloc[idx]['target']
+        
+        source_group = id_to_group.get(source_id)
+        if source_group:
+            edges_df.iloc[idx, edges_df.columns.get_loc('source')] = f"{source_id}({source_group})"
+        else:
+            missing_source += 1
+            
+        target_group = id_to_group.get(target_id)
+        if target_group:
+            edges_df.iloc[idx, edges_df.columns.get_loc('target')] = f"{target_id}({target_group})"
+        else:
+            missing_target += 1
+    
+    # Progress logging
+    chunk_num = (i // chunk_size) + 1
+    total_chunks = (total_edges + chunk_size - 1) // chunk_size
+    if chunk_num % 10 == 0 or chunk_num == total_chunks:
+        logger.info(f"  Processed chunk {chunk_num}/{total_chunks}")
+    
+    # Memory cleanup every 20 chunks
+    if chunk_num % 20 == 0:
+        gc.collect()
+
+logger.info(f"✓ Added group suffixes (missing sources: {missing_source}, missing targets: {missing_target})")
+log_progress("Group suffix addition completed", start_suffix)
+
+# Remove edges with missing group information (orphaned edges)
+initial_count = len(edges_df)
+edges_df = edges_df[edges_df['source'].str.contains(r'\(', regex=True, na=False)]
+edges_df = edges_df[edges_df['target'].str.contains(r'\(', regex=True, na=False)]
+final_count = len(edges_df)
+
+if initial_count > final_count:
+    logger.info(f"Removed {initial_count - final_count:,} orphaned edges")
+
+# Rename for Neo4j admin import format
+edges_df = edges_df.rename(columns={
+    'source': ':START_ID',
+    'target': ':END_ID',
+    'type': ':TYPE',
+    'data_source': 'data_source:string',
+    'evidence': 'evidence:string',
+    'target_name': 'target_name:string',
+    'actions': 'actions:string',
+    'organism': 'organism:string'
+})
+
+# Select relevant columns for edges
+columns = [':START_ID', ':END_ID', ':TYPE', 'data_source:string', 'evidence:string']
+
+# Add optional columns if they exist
+optional_columns = ['target_name:string', 'actions:string', 'organism:string', 
+                   'max_phase:string', 'efo_name:string', 'pathwayName:string', 'via_target:string']
+for col in optional_columns:
+    if col in edges_df.columns:
+        columns.append(col)
+
 edges_output_path = os.path.join(OUTPUT_DIR, "edges.csv")
-edges_df.to_csv(edges_output_path, index=False)
-logger.info(f"✓ Saved edges to: {edges_output_path}")
+edges_df[columns].to_csv(edges_output_path, index=False)
+
+logger.info(f"✓ Saved {len(edges_df):,} edges to {edges_output_path}")
 log_progress("Edges creation completed", start_edges)
 
 # Final summary
 logger.info("\n" + "="*60)
-logger.info("GENERATION COMPLETE")
+logger.info("GENERATION COMPLETE - NEO4J ADMIN IMPORT FORMAT")
 logger.info("="*60)
 total_duration = time.time() - start_total
 logger.info(f"Total execution time: {total_duration:.2f} seconds")
 logger.info(f"Output directory: {OUTPUT_DIR}")
-logger.info(f"Files generated:")
-logger.info(f"  - nodes.csv: {len(nodes)} nodes")
-logger.info(f"  - edges.csv: {len(edges)} edges")
-print(f"\n🎉 CSVs generated successfully in {OUTPUT_DIR}")
-print(f"📊 Summary: {len(nodes)} nodes, {len(edges)} edges")
+logger.info(f"Files generated for Neo4j admin import:")
+
+# Count nodes by type
+node_counts = {}
+for node_type in nodes_by_type.keys():
+    node_counts[node_type] = len(nodes_by_type[node_type])
+    logger.info(f"  - nodes_{node_type.lower()}.csv: {node_counts[node_type]:,} nodes")
+
+logger.info(f"  - edges.csv: {len(edges_df):,} edges")
+logger.info(f"Total: {sum(node_counts.values()):,} nodes, {len(edges_df):,} edges")
+
+print(f"\n🎉 Neo4j admin import CSVs generated successfully!")
+print(f"📊 Summary: {sum(node_counts.values()):,} nodes, {len(edges_df):,} edges")
 print(f"⏱️  Total time: {total_duration:.2f} seconds")
+print(f"\n🚀 To import into Neo4j:")
+print(f"sudo systemctl stop neo4j")
+print(f"sudo rm -rf /var/lib/neo4j/data/databases/neo4j/*")
+print(f"sudo cp {OUTPUT_DIR}/* /var/lib/neo4j/import/")
+print(f"sudo chown neo4j:neo4j /var/lib/neo4j/import/*")
+
+# Generate the import command
+import_cmd = "sudo neo4j-admin database import full neo4j \\\n"
+for node_type in sorted(node_counts.keys()):
+    import_cmd += f"  --nodes={node_type}=/var/lib/neo4j/import/nodes_{node_type.lower()}.csv \\\n"
+import_cmd += f"  --relationships=/var/lib/neo4j/import/edges.csv \\\n"
+import_cmd += f"  --overwrite-destination=true"
+
+print(import_cmd)
+print(f"sudo systemctl start neo4j")
+print(f"sudo neo4j-admin database import full neo4j   --nodes=Disease=/var/lib/neo4j/import/nodes_disease.csv   --nodes=Drug=/var/lib/neo4j/import/nodes_drug.csv   --nodes=Pathway=/var/lib/neo4j/import/nodes_pathway.csv   --nodes=Target=/var/lib/neo4j/import/nodes_target.csv   --relationships=/var/lib/neo4j/import/edges.csv   --overwrite-destination=true   --verbose")
