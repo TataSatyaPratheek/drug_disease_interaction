@@ -9,15 +9,15 @@ description = "Drug-Disease Interaction Prediction using Graph Neural Networks"
 authors = [{name = "Satya Pratheek TATA", email = "satyapratheek.tata@edhec.com"}]
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
 dependencies = [
-    "llama-index",
+    # ... your existing dependencies
+    "llama-index>=0.10.0",
     "streamlit-agraph",
     "tenacity",
     "streamlit",
@@ -55,6 +55,8 @@ dependencies = [
     "weaviate-client==4.8.0",
     "neo4j>=5.28.1",
     "pytest>=8.3.5",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
     "redis>=6.1.1",
     "fastapi-cache2>=0.2.2",
 ]
@@ -97,11 +99,9 @@ disallow_incomplete_defs = true
 where = ["src"]
 
 [tool.pytest.ini_options]
-# Tell pytest to only look for tests in the src/tests directory
 testpaths = [
     "src/tests",
 ]
-# Explicitly tell pytest to NOT go into these directories
 norecursedirs = [
     "data",
     "docker",
@@ -109,7 +109,17 @@ norecursedirs = [
     "aux_files",
     ".venv",
 ]
-# Register the asyncio mark to fix the warning
 markers = [
     "asyncio: mark a test as asynchronous.",
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "unit: marks tests as unit tests",
 ]
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+    "--disable-warnings",
+    "-ra"
+]
+# You can also add custom commands
+[project.scripts]
+test-unit = "test_runner:main"

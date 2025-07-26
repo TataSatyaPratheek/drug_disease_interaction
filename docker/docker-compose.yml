@@ -24,6 +24,11 @@ services:
         limits:
           memory: 8G
           cpus: '6'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.25.0
@@ -62,7 +67,7 @@ services:
   ollama:
     image: ollama/ollama:latest
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:

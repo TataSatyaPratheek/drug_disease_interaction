@@ -3,19 +3,19 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install poetry
-RUN pip install poetry
+# Install pip build dependencies
+RUN pip install --upgrade pip
 
-# Copy dependency files
-COPY pyproject.toml poetry.lock ./
+# Copy dependency files and README for setuptools
+COPY pyproject.toml README.md ./
+COPY src/ ./src
 
-# Install dependencies
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-dev --no-interaction --no-ansi
+# Install project dependencies using pip and setuptools
+RUN pip install .
 
 # Copy the rest of the application code
-COPY . .
+COPY src/ ./src
 
 EXPOSE 8000
 
-CMD ["poetry", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
