@@ -1,6 +1,8 @@
 # .gitignore
-"""
-# Python
+
+####################################
+# Python Core
+####################################
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,48 +25,118 @@ wheels/
 *.egg
 MANIFEST
 
-# Project specific
-._*
-data/raw/
-data/processed/
-data/external/
-data/graph/
-data/databases
-data/weaviate_db/
-outputs/
-tests/test_data/
-tests/test_output/
-
-# Jupyter Notebooks
-.ipynb_checkpoints
-*/.ipynb_checkpoints/*
-
-# Virtual Environment
+####################################
+# Virtual Environments & Package Managers
+####################################
 venv/
 env/
 ENV/
 .env
+.env.*
+!.env.example
+# Keep uv.lock (equivalent to package-lock.json)
+# uv.lock should NOT be ignored
 
-# IDE
+####################################
+# Project-Specific Data (Your Structure)
+####################################
+data/
+
+####################################
+# Logs & Temporary Files
+####################################
+logs/
+*.log
+cufile.log
+
+# Temporary & cache files
+.cache/
+*.tmp
+*.temp
+database_lock
+id-buffer.tmp.*
+
+####################################
+# Development & IDE
+####################################
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+.pytest_cache/
 
-# Logs
-*.log
-logs/
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
 
-# Test coverage
+####################################
+# Testing & Coverage
+####################################
 htmlcov/
 .tox/
 .coverage
 .coverage.*
-.cache
 nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
-"""
+tests/test_data/
+tests/test_output/
 
+####################################
+# Docker & Deployment
+####################################
+.docker/
+docker-compose.override.yml
+.dockerignore
+
+####################################
+# Keep These Important Files
+####################################
+# Configuration files (small, important)
+!config/hardware_optimized.json
+!aux_files/
+!pyproject.toml
+!requirements.txt
+!docker/docker-compose.yml
+!docker/Dockerfile
+
+# CSV headers and small files (for structure reference)
+!data/processed/graph_csv/nodes_*.csv
+!data/processed/graph_csv/edges.csv
+!data/processed/mappings/disease_mapping.csv
+!data/processed/mappings/target_mapping.csv
+
+# Scripts and source code
+!scripts/
+!src/
+
+####################################
+# OS & Editor Generated
+####################################
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+####################################
+# Backup files
+####################################
+*.bak
+*.backup
+*~
+.backup/
+backup/
