@@ -29,6 +29,7 @@ data/raw/
 data/processed/
 data/external/
 data/graph/
+data/databases
 data/weaviate_db/
 outputs/
 tests/test_data/
