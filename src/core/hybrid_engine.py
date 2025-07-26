@@ -1,13 +1,16 @@
 # src/core/hybrid_engine.py - USE LLAMAINDEX QUERY ENGINE PATTERN
+
 from llama_index.core.query_engine import BaseQueryEngine
-from llama_index.core.base.base_query_engine import BaseQueryEngine
+from llama_index.core.callbacks import CallbackManager
 from llama_index.core import QueryBundle
 from llama_index.core.response import Response
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
+
+
 
 
 class HybridRAGEngine(BaseQueryEngine):
@@ -15,18 +18,46 @@ class HybridRAGEngine(BaseQueryEngine):
     Production Hybrid RAG Engine using LlamaIndex patterns
     Orchestrates Neo4j (graph) + Weaviate (vector) + Ollama (LLM)
     """
-
     def __init__(
         self,
         neo4j_service,
         weaviate_service,
         llm_service,
-        config: Dict[str, Any]
+        config: Dict[str, Any],
+        **kwargs,
     ):
         self.neo4j = neo4j_service
         self.weaviate = weaviate_service
         self.llm = llm_service
         self.config = config
+        # Call parent __init__ to set up callback_manager and other essentials
+        super().__init__(callback_manager=kwargs.get("callback_manager"), **kwargs)
+
+    def _query(self, query_bundle: QueryBundle) -> Response:
+        """Sync query method. Standard practice is to wrap the async version."""
+        return asyncio.run(self._aquery(query_bundle))
+
+    async def _aquery(self, query_bundle: QueryBundle) -> Response:
+        """Async query method. This is where the main logic lives."""
+        retrieved_results = await self._retrieve_async(query_bundle.query_str)
+        # Build context string
+        context = "\n".join([r.get('name', '') + ": " + r.get('description', '') for r in retrieved_results[:10]])
+        # Generate response
+        response_text = await self.llm.generate_response(context, query_bundle.query_str)
+        # Create LlamaIndex Response object
+        return Response(
+            response=response_text,
+            source_nodes=[],  # You can create NodeWithScore objects here for full LlamaIndex compatibility
+            metadata={
+                'retrieved_results': retrieved_results,
+                'sources': ['neo4j', 'weaviate'],
+                'query': query_bundle.query_str
+            }
+        )
+
+    def _get_prompt_modules(self) -> Dict[str, Any]:
+        """Return prompt modules. For a custom engine, this can often be empty."""
+        return {}
 
     async def _retrieve_async(self, query: str) -> List[Dict[str, Any]]:
         """Asynchronously retrieves data from both databases."""
@@ -73,20 +104,3 @@ class HybridRAGEngine(BaseQueryEngine):
 
         # Sort by the new normalized score
         return sorted(merged, key=lambda x: x['normalized_score'], reverse=True)[:20]
-
-    async def aquery(self, query_bundle: QueryBundle) -> Response:
-        retrieved_results = await self._retrieve_async(query_bundle.query_str)
-        # Build context string
-        context = "\n".join([r.get('name', r.get('content', '')) for r in retrieved_results[:10]])
-        # Generate response
-        response_text = await self.llm.generate_response(context, query_bundle.query_str)
-        # Create LlamaIndex Response object
-        return Response(
-            response=response_text,
-            source_nodes=[],
-            metadata={
-                'retrieved_results': retrieved_results,
-                'sources': ['neo4j', 'weaviate'],
-                'query': query_bundle.query_str
-            }
-        )

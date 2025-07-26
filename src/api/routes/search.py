@@ -32,12 +32,12 @@ async def hybrid_search(
         retrieved_results = response.metadata.get('retrieved_results', [])
         for result in retrieved_results[:request.max_results]:
             entities.append(EntityResult(
-                id=result['metadata'].get('id', 'unknown'),
-                name=result['metadata'].get('name', 'Unknown'),
-                type=result['metadata'].get('collection', result['metadata'].get('type', 'Entity')),
-                score=result['score'],
-                description=result['metadata'].get('description', ''),
-                source=result['source']
+                id=result.get('id', 'unknown'),
+                name=result.get('name', 'Unknown'),
+                type=result.get('collection', result.get('source', 'Entity')),
+                score=result.get('score', 0.0),
+                description=result.get('description', ''),
+                source=result.get('source', 'unknown')
             ))
         processing_time = (time.time() - start_time) * 1000
         return HybridSearchResponse(

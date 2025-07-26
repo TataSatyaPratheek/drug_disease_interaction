@@ -24,9 +24,10 @@ class OllamaConfig(BaseSettings):
     class Config:
         env_prefix = "DDI_OLLAMA_"
 
+
 class AppConfig(BaseSettings):
-    database: DatabaseConfig = DatabaseConfig()
-    ollama: OllamaConfig = OllamaConfig()
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     hardware: Dict[str, Any] = {}
 
     def __init__(self, **values: Any):

@@ -1,9 +1,12 @@
 
 # src/api/models/requests.py - ENHANCED WITH VALIDATION
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
+
 from enum import Enum
 
+
+# QueryType definition
 class QueryType(str, Enum):
     GENERAL = "general"
     DRUG_SEARCH = "drug_search"
@@ -11,13 +14,14 @@ class QueryType(str, Enum):
     INTERACTION = "drug_disease_interaction"
     PATHWAY = "pathway_analysis"
 
+# HybridSearchRequest definition
 class HybridSearchRequest(BaseModel):
     query: str = Field(
         ..., 
         min_length=1, 
         max_length=500, 
         description="Search query",
-        example="What drugs treat hypertension?"
+        json_schema_extra={'examples': ["What drugs treat hypertension?"]}
     )
     query_type: Optional[QueryType] = Field(
         default=QueryType.GENERAL,
@@ -37,17 +41,19 @@ class HybridSearchRequest(BaseModel):
         default=True, 
         description="Include vector similarity search"
     )
-    
-    @validator('query')
-    def validate_query(cls, v):
+
+    @field_validator('query')
+    @classmethod
+    def validate_query(cls, v: str) -> str:
         if not v.strip():
             raise ValueError('Query cannot be empty or just whitespace')
         return v.strip()
 
+# EntityDetailsRequest definition
 class EntityDetailsRequest(BaseModel):
     entity_id: str = Field(
         ..., 
         min_length=1,
         description="Entity ID to get details for",
-        example="DB00001"
+        json_schema_extra={'examples': ["DB00001"]}
     )

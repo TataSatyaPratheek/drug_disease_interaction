@@ -93,3 +93,23 @@ disallow_incomplete_defs = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+# Tell pytest to only look for tests in the src/tests directory
+testpaths = [
+    "src/tests",
+]
+# Explicitly tell pytest to NOT go into these directories
+norecursedirs = [
+    "data",
+    "docker",
+    "logs",
+    "aux_files",
+    ".venv",
+]
+# Register the asyncio mark to fix the warning
+markers = [
+    "asyncio: mark a test as asynchronous.",
+]
+# Tell pytest-docker where to find the compose file
+docker_compose_file = "docker/docker-compose.yml"
