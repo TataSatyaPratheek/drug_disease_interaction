@@ -1,4 +1,30 @@
+# docker/docker-compose.yml - CORRECTED VERSION
 services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=123lol123
+      - WEAVIATE_URL=http://weaviate:8080
+    depends_on:
+      - neo4j
+      - weaviate
+      - ollama
+    volumes:
+      - ../config:/app/config
+      - ../logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '6'
+
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.25.0
     ports:
@@ -9,10 +35,10 @@ services:
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
       DEFAULT_VECTORIZER_MODULE: 'none'
-      # ✅ Removed ENABLE_MODULES completely since you use local embeddings
       CLUSTER_HOSTNAME: 'node1'
     volumes:
-      - weaviate_data:/var/lib/weaviate
+      # ✅ FIXED: Use host path mount instead of named volume
+      - ../data/databases/vector:/var/lib/weaviate
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
@@ -20,5 +46,37 @@ services:
       timeout: 10s
       retries: 3
 
+  neo4j:
+    image: neo4j:5.13
+    environment:
+      - NEO4J_AUTH=neo4j/123lol123
+      - NEO4J_server_memory_heap_initial__size=4G
+      - NEO4J_server_memory_heap_max__size=8G
+      - NEO4J_server_memory_pagecache_size=4G
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      # ✅ Your existing Neo4j path (already correct)
+      - ../data/databases/neo4j:/data
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      # ✅ Keep Ollama as named volume (models are large and portable)
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_GPU_LAYERS=32
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ✅ UPDATED: Removed weaviate_data since we use host mount now
 volumes:
-  weaviate_data:
+  ollama_data:
