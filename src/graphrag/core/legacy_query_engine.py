@@ -1,23 +1,17 @@
 
 from typing import Dict, List, Any, Optional
 import logging
-from .neo4j_query_engine import Neo4jGraphRAGEngine
-from .neo4j_analytics import Neo4jGraphAnalytics, HighPerformanceGraphAnalytics
 from .llama_integration import LlamaGraphRAGEngine
 from .retriever import GraphRetriever
 from .context_builder import ContextBuilder
 from .prompt_templates import PromptTemplates
 from .vector_store import WeaviateGraphStore
-# Import optimized components for better performance
-from .optimized_vector_store import OptimizedWeaviateGraphStore
-from .optimized_context_builder import OptimizedContextBuilder, create_optimized_context_builder
-from .optimized_cache_manager import OptimizedCacheManager, create_optimized_cache_manager
-from .enhanced_connection_resilience import connection_manager, with_resilience
 from ..generators.llm_client import LocalOllamaClient
 from ..generators.response_builder import ResponseBuilder
 from ..retrievers import SubgraphRetriever, PathRetriever, CommunityRetriever
 from .query_processor import preprocess_query, classify_query_type, QueryStrategy
 from .result_aggregator import aggregate_search_results, format_results_for_llm, generate_followup_questions
+from .graph_analytics import HighPerformanceGraphAnalytics
 from .connection_resilience import ConnectionResilience
 import streamlit as st
 
@@ -25,335 +19,81 @@ logger = logging.getLogger(__name__)
 
 
 class GraphRAGQueryEngine:
-    """Enhanced GraphRAG orchestrator with hardware-optimized performance."""
+    """Enhanced GraphRAG orchestrator with high-performance analytics."""
     
-    def __init__(self, graph, llm_client: LocalOllamaClient, vector_store: WeaviateGraphStore, neo4j_driver=None):
-        """Initialize query engine with optional Neo4j driver and optimized components"""
+    def __init__(self, graph, llm_client: LocalOllamaClient, vector_store: WeaviateGraphStore):
         self.graph = graph
+        self.retriever = GraphRetriever(graph)
+        self.context_builder = ContextBuilder(graph)
+        self.prompt_templates = PromptTemplates()
         self.llm_client = llm_client
         self.vector_store = vector_store
-        self.prompt_templates = PromptTemplates()
         self.response_builder = ResponseBuilder()
+        self.subgraph_retriever = SubgraphRetriever(graph)
+        self.path_retriever = PathRetriever(graph)
+        self.community_retriever = CommunityRetriever(graph)
+        self.analytics = HighPerformanceGraphAnalytics(graph)
         self.resilience = ConnectionResilience()
-        
-        # Initialize optimized components for better performance
-        self.cache_manager = create_optimized_cache_manager()
-        self.optimized_context_builder = create_optimized_context_builder()
-        
-        # Register connection resilience for critical services
-        connection_manager.register_circuit_breaker("vector_search", failure_threshold=5)
-        connection_manager.register_retry_strategy("llm_generation", max_retries=3)
-        
-        # Setup optimized vector store if needed
-        if hasattr(vector_store, 'client'):
-            self.optimized_vector_store = OptimizedWeaviateGraphStore(
-                client=vector_store.client,
-                max_workers=4,
-                cache_size=1000
-            )
-        else:
-            self.optimized_vector_store = vector_store
-        
-        # Choose analytics implementation based on Neo4j availability
-        if neo4j_driver:
-            logger.info("🚀 Using Neo4j-native analytics")
-            self.analytics = Neo4jGraphAnalytics(neo4j_driver)
-            self.neo4j_engine = Neo4jGraphRAGEngine(neo4j_driver, vector_store, llm_client)
-            self.use_neo4j = True
-            # Skip legacy retrievers for Neo4j mode
-            self.retriever = None
-            self.context_builder = None
-            self.subgraph_retriever = None
-            self.path_retriever = None
-            self.community_retriever = None
-            self.llama_engine = None
-        else:
-            logger.info("📊 Using legacy NetworkX analytics")
-            self.analytics = HighPerformanceGraphAnalytics(graph)
-            self.neo4j_engine = None
-            self.use_neo4j = False
-            # Initialize legacy components only when graph is available
-            if graph is not None:
-                self.retriever = GraphRetriever(graph)
-                self.context_builder = ContextBuilder(graph)
-                self.subgraph_retriever = SubgraphRetriever(graph)
-                self.path_retriever = PathRetriever(graph)
-                self.community_retriever = CommunityRetriever(graph)
-                # Initialize LlamaIndex integration
-                self.llama_engine = LlamaGraphRAGEngine(
-                    nx_graph=graph,
-                    vector_store=vector_store,
-                    llm_client=llm_client,
-                    path_retriever=self.path_retriever,
-                    community_retriever=self.community_retriever,
-                    subgraph_retriever=self.subgraph_retriever
-                )
-            else:
-                # Disable legacy components when graph is None
-                logger.warning("Graph is None - disabling legacy components")
-                self.retriever = None
-                self.context_builder = None
-                self.subgraph_retriever = None
-                self.path_retriever = None
-                self.community_retriever = None
-                self.llama_engine = None
+        # Initialize LlamaIndex integration
+        self.llama_engine = LlamaGraphRAGEngine(
+            nx_graph=graph,
+            vector_store=vector_store,
+            llm_client=llm_client,
+            path_retriever=self.path_retriever,
+            community_retriever=self.community_retriever,
+            subgraph_retriever=self.subgraph_retriever
+        )
     
-    @classmethod
-    def create_neo4j_engine(cls, neo4j_driver, vector_store: WeaviateGraphStore, llm_client: LocalOllamaClient):
-        """Factory method to create a Neo4j-native engine"""
-        # Create a dummy driver if none provided for testing
-        test_driver = neo4j_driver if neo4j_driver is not None else "test_driver"
-        return cls(graph=None, llm_client=llm_client, vector_store=vector_store, neo4j_driver=test_driver)
-    
-    @classmethod
-    def create_legacy_engine(cls, graph, vector_store: WeaviateGraphStore, llm_client: LocalOllamaClient):
-        """Factory method to create a legacy NetworkX engine"""
-        # For testing purposes, skip initialization if graph is None
-        if graph is None:
-            logger.warning("Legacy engine created with None graph - some features will be disabled")
-        return cls(graph=graph, llm_client=llm_client, vector_store=vector_store, neo4j_driver=None)
-    
-    @with_resilience("query_processing")
+    @ConnectionResilience.with_retry(max_attempts=3, wait_seconds=2)
     def query(self, user_query: str, query_type: str = "auto", max_results: int = 15) -> Dict[str, Any]:
-        """Enhanced query processing with hardware optimizations and caching."""
-        logger.info(f"Processing query: '{user_query}' (Neo4j mode: {self.use_neo4j})")
-        
-        # Create cache key for query
-        cache_key = f"query:{hash(user_query + str(max_results))}"
-        
-        # Try to get cached result
-        cached_result = self.cache_manager.get(cache_key)
-        if cached_result is not None:
-            logger.info("Returning cached query result")
-            return cached_result
-        
-        # Use Neo4j engine if available for better performance
-        if self.use_neo4j and self.neo4j_engine:
-            logger.info("🚀 Delegating to Neo4j-native engine")
-            try:
-                result = self.neo4j_engine.query(user_query, max_results)
-                # Cache successful result
-                self.cache_manager.put(cache_key, result, ttl=300)  # 5 minutes
-                return result
-            except Exception as e:
-                logger.warning(f"Neo4j engine failed, falling back to legacy: {e}")
-                # Fall through to legacy implementation
-        
-        # Legacy implementation with optimizations
+        """Enhanced query processing with graph analytics."""
+        logger.info(f"Processing query: '{user_query}'")
         try:
-            # 1. Enhanced entity retrieval with optimized vector store
-            entities = self._enhanced_vector_entity_search_optimized(user_query, max_results)
+            # 1. Entity retrieval (enhanced with analytics)
+            entities = self._enhanced_vector_entity_search(user_query, max_results)
             total_entities = sum(len(v) for v in entities.values())
             logger.info(f"Retrieved {total_entities} entities total")
-            
-            # 2. Build graph-aware context using optimized context builder
-            graph_context = self._build_enhanced_graph_context_optimized(entities, user_query)
-            
+            # 2. Build graph-aware context
+            graph_context = self._build_enhanced_graph_context(entities, user_query)
             # 3. Create prompt with graph intelligence
             detailed_prompt = self._create_graph_aware_prompt(user_query, graph_context, entities)
-            
-            # 4. Generate response with robust LLM call and caching
+            # 4. Generate response with robust LLM call
             logger.info("Calling LLM for response generation...")
             try:
-                llm_cache_key = f"llm:{hash(detailed_prompt)}"
-                cached_llm_result = self.cache_manager.get(llm_cache_key)
-                
-                if cached_llm_result:
-                    reasoning, final_answer = cached_llm_result
-                    logger.info("Using cached LLM response")
-                else:
-                    reasoning, final_answer = self.resilience.robust_ollama_call(
-                        self.llm_client, detailed_prompt
-                    )
-                    # Cache LLM response
-                    self.cache_manager.put(llm_cache_key, (reasoning, final_answer), ttl=600)  # 10 minutes
-                
+                reasoning, final_answer = self.resilience.robust_ollama_call(
+                    self.llm_client, detailed_prompt
+                )
                 logger.info(f"LLM response generated - Reasoning: {len(reasoning)} chars, Answer: {len(final_answer)} chars")
             except Exception as llm_error:
                 logger.error(f"LLM generation failed: {llm_error}")
                 reasoning = f"LLM generation failed: {str(llm_error)}"
                 final_answer = f"Unable to generate response due to LLM error: {str(llm_error)}"
-            
-            # 5. Extract advanced graph features (with caching)
-            path_data = self._extract_path_data(entities, user_query)
-            community_data = self._extract_community_data(entities)
+            # 5. Extract advanced graph features
+            path_data = self._extract_enhanced_path_data(entities, user_query)
+            community_data = self._extract_enhanced_community_data(entities)
             node_importance = self._get_node_importance_rankings(entities)
-            
             # 6. Build comprehensive response
             response = {
                 'response': final_answer,
                 'reasoning': reasoning,
                 'retrieved_data': entities,
                 'citations': self._build_citations(entities),
-                'suggested_followups': self._generate_query_specific_followups(user_query, entities),
+                'suggested_followups': self._generate_graph_aware_followups(user_query, entities),
                 'query_type': query_type,
                 'confidence_score': self._calculate_response_confidence(entities, total_entities),
                 'subgraph_context': graph_context,
                 'path_data': path_data,
                 'community_data': community_data,
                 'node_importance': node_importance,
-                'graph_metrics': self._get_query_specific_metrics(entities),
-                'cache_stats': self.cache_manager.get_comprehensive_stats()
+                'graph_metrics': self._get_query_specific_metrics(entities)
             }
-            
-            # Cache the complete response
-            self.cache_manager.put(cache_key, response, ttl=300)  # 5 minutes
-            
             logger.info("Enhanced query processing completed")
             return response
         except Exception as e:
             logger.error(f"Query processing failed: {e}")
             raise
 
-    def _enhanced_vector_entity_search_optimized(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
-        """Enhanced vector search with optimized store and caching."""
-        cache_key = f"vector_search:{hash(query + str(max_results))}"
-        
-        # Try cache first
-        cached_result = self.cache_manager.get(cache_key)
-        if cached_result is not None:
-            logger.debug("Using cached vector search result")
-            return cached_result
-        
-        try:
-            # Use optimized vector store if available
-            if hasattr(self, 'optimized_vector_store'):
-                base_results = self.optimized_vector_store.search_entities(
-                    query=query,
-                    entity_types=["Drug", "Disease", "Protein"],
-                    n_results=max_results
-                )
-                # Convert to expected format
-                result = {'drugs': [], 'diseases': [], 'proteins': []}
-                for entity in base_results:
-                    entity_type = entity.get('type', 'unknown').lower()
-                    if entity_type in ['drug', 'compound']:
-                        result['drugs'].append(entity)
-                    elif entity_type in ['disease', 'disorder', 'syndrome']:
-                        result['diseases'].append(entity)
-                    elif entity_type in ['protein', 'polypeptide', 'enzyme']:
-                        result['proteins'].append(entity)
-                base_results = result
-            else:
-                # Fallback to original method
-                base_results = self._vector_entity_search(query, max_results)
-            
-            # Enhance with graph analytics (cached)
-            enhanced_results = self._enhance_with_analytics_cached(base_results)
-            
-            # Cache result
-            self.cache_manager.put(cache_key, enhanced_results, ttl=180)  # 3 minutes
-            
-            return enhanced_results
-            
-        except Exception as e:
-            logger.error(f"Optimized vector search failed: {e}")
-            # Fallback to original method
-            return self._enhanced_vector_entity_search(query, max_results)
-    
-    def _enhance_with_analytics_cached(self, base_results: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
-        """Enhance results with analytics, using caching for expensive operations"""
-        
-        # Enhance with graph analytics
-        for entity_type, entities in base_results.items():
-            for entity in entities:
-                entity_id = entity.get('id')
-                if entity_id:
-                    # Cache key for analytics
-                    analytics_key = f"analytics:{entity_type}:{entity_id}"
-                    cached_analytics = self.cache_manager.get(analytics_key)
-                    
-                    if cached_analytics:
-                        entity.update(cached_analytics)
-                    else:
-                        try:
-                            # Add importance ranking
-                            importance_rankings = self.analytics.rank_nodes_by_importance(
-                                entity_type, top_k=100
-                            )
-                            # Find this entity in rankings
-                            analytics_data = {}
-                            for rank, ranked_entity in enumerate(importance_rankings):
-                                if ranked_entity['id'] == entity_id:
-                                    analytics_data = {
-                                        'importance_rank': rank + 1,
-                                        'importance_score': ranked_entity['importance_score'],
-                                        'centrality_metrics': {
-                                            'pagerank': ranked_entity['pagerank'],
-                                            'betweenness': ranked_entity['betweenness'],
-                                            'closeness': ranked_entity['closeness'],
-                                            'degree': ranked_entity['degree']
-                                        }
-                                    }
-                                    break
-                            
-                            # Cache analytics data
-                            if analytics_data:
-                                self.cache_manager.put(analytics_key, analytics_data, ttl=3600)  # 1 hour
-                                entity.update(analytics_data)
-                                
-                        except Exception as e:
-                            logger.warning(f"Analytics enhancement failed for {entity_id}: {e}")
-        
-        return base_results
-    
-    def _build_enhanced_graph_context_optimized(self, entities: Dict, query: str) -> str:
-        """Build enhanced context using optimized context builder with caching."""
-        cache_key = f"context:{hash(str(entities) + query)}"
-        
-        # Try cache first
-        cached_context = self.cache_manager.get(cache_key)
-        if cached_context is not None:
-            logger.debug("Using cached graph context")
-            return cached_context
-        
-        try:
-            # Prepare data for optimized context builder
-            entity_names = []
-            relationships = []
-            vector_results = []
-            
-            # Extract entity names
-            for entity_type, entity_list in entities.items():
-                for entity in entity_list:
-                    entity_names.append(entity.get('name', 'Unknown'))
-            
-            # Create mock relationships (in real implementation, these would come from graph)
-            for entity_type, entity_list in entities.items():
-                for entity in entity_list:
-                    relationships.append({
-                        'source': entity.get('name', 'Unknown'),
-                        'target': 'related_entity',
-                        'type': f'{entity_type}_relation',
-                        'description': f'Relationship involving {entity.get("name", "Unknown")}'
-                    })
-            
-            # Convert entities to vector results format
-            for entity_type, entity_list in entities.items():
-                for entity in entity_list:
-                    vector_results.append({
-                        'content': f"{entity.get('name', 'Unknown')} - {entity.get('description', 'No description')}",
-                        'entity': entity.get('name', 'Unknown'),
-                        'score': entity.get('similarity', 0.5)
-                    })
-            
-            # Use optimized context builder
-            context = self.optimized_context_builder.build_context_parallel(
-                entities=entity_names,
-                relationships=relationships,
-                vector_results=vector_results,
-                max_length=8000
-            )
-            
-            # Cache the context
-            self.cache_manager.put(cache_key, context, ttl=300)  # 5 minutes
-            
-            return context
-            
-        except Exception as e:
-            logger.error(f"Optimized context building failed: {e}")
-            # Fallback to original method
-            return self._build_enhanced_graph_context(entities, query)
+    def _enhanced_vector_entity_search(self, query: str, max_results: int) -> Dict[str, List[Dict]]:
         """Enhanced vector search with graph analytics ranking."""
         try:
             # Get basic vector search results
@@ -402,8 +142,8 @@ class GraphRAGQueryEngine:
                             f"- {name} (Importance Rank: {importance_rank}, "
                             f"Score: {importance_score:.4f})"
                         )
-            # Add community insights - only if community retriever exists
-            if total_entities > 0 and self.community_retriever:
+            # Add community insights
+            if total_entities > 0:
                 community_stats = self.community_retriever.get_community_statistics()
                 if community_stats:
                     context_parts.append(f"\nCOMMUNITY INSIGHTS:")
@@ -481,21 +221,6 @@ Please provide a comprehensive analysis leveraging the graph intelligence."""
             logger.error(f"Confidence calculation failed: {e}")
             return 0.5
 
-    def _get_node_importance_rankings(self, entities: Dict) -> Dict[str, Any]:
-        """Get node importance rankings using analytics."""
-        try:
-            rankings = {}
-            for entity_type, entity_list in entities.items():
-                if entity_list:
-                    type_rankings = self.analytics.rank_nodes_by_importance(
-                        entity_type, top_k=min(len(entity_list), 20)
-                    )
-                    rankings[entity_type] = type_rankings
-            return rankings
-        except Exception as e:
-            logger.warning(f"Node importance ranking failed: {e}")
-            return {}
-
     def _get_query_specific_metrics(self, entities: Dict) -> Dict[str, Any]:
         """Get query-specific graph metrics."""
         try:
@@ -524,10 +249,6 @@ Please provide a comprehensive analysis leveraging the graph intelligence."""
     def _extract_path_data(self, entities: Dict, query: str) -> 'Optional[Dict]':
         """Extract path data for visualization."""
         try:
-            # Skip if path retriever not available (Neo4j mode)
-            if not self.path_retriever:
-                return None
-                
             # Get entity IDs for path finding
             all_ids = [e['id'] for entity_list in entities.values() for e in entity_list if e.get('id')]
             
@@ -548,10 +269,6 @@ Please provide a comprehensive analysis leveraging the graph intelligence."""
     def _extract_community_data(self, entities: Dict) -> 'Optional[List[Dict]]':
         """Extract community data for visualization."""
         try:
-            # Skip if community retriever not available (Neo4j mode)
-            if not self.community_retriever:
-                return None
-                
             # Get entity IDs for community analysis
             all_ids = [e['id'] for entity_list in entities.values() for e in entity_list if e.get('id')]
             
@@ -588,8 +305,8 @@ Please provide a comprehensive analysis leveraging the graph intelligence."""
                     if entity_id:
                         all_entity_ids.append(entity_id)
                         
-                        # Get immediate neighbors from graph - only if graph exists
-                        if self.graph and entity_id in self.graph:
+                        # Get immediate neighbors from graph - FIX HERE
+                        if entity_id in self.graph:
                             neighbors = list(self.graph.neighbors(entity_id))[:3]
                             if neighbors:
                                 neighbor_names = []
@@ -606,8 +323,8 @@ Please provide a comprehensive analysis leveraging the graph intelligence."""
                                 if neighbor_names:
                                     context_parts.append(f"  Connected to: {', '.join(neighbor_names)}")
         
-        # Find relationships between entities - only if graph exists
-        if self.graph and len(all_entity_ids) >= 2:
+        # Find relationships between entities
+        if len(all_entity_ids) >= 2:
             context_parts.append(f"\nGRAPH RELATIONSHIPS:")
             paths_found = 0
             for i, entity1 in enumerate(all_entity_ids[:3]):
@@ -704,10 +421,6 @@ Please provide a comprehensive analysis leveraging the graph intelligence."""
 
     def _enrich_with_graph_context(self, entities: Dict, query: str) -> str:
         """Enrich vector results with graph neighborhood context"""
-        # Skip if legacy components not available
-        if not self.context_builder or not self.retriever:
-            return f"Graph context unavailable - using vector results only for query: '{query}'"
-            
         contexts = []
         for entity_type, entity_list in entities.items():
             for entity in entity_list[:3]:  # Top 3 per type

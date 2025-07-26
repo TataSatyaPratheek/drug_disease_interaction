@@ -71,3 +71,30 @@ RESPONSE REQUIREMENTS:
 Provide a comprehensive clinical comparison based on the available evidence."""
 
         return prompt
+
+
+class PromptTemplates:
+    """Legacy compatibility wrapper for prompt templates"""
+    
+    def __init__(self):
+        self.scientific = ScientificPromptTemplates()
+    
+    def general_query_prompt(self, query: str, context: str) -> str:
+        """General query prompt using scientific template"""
+        entities = {'drugs': [], 'diseases': [], 'proteins': []}
+        return self.scientific.biomedical_analysis_prompt(query, context, entities)
+    
+    def drug_repurposing_prompt(self, query: str, context: str) -> str:
+        """Drug repurposing prompt"""
+        entities = {'drugs': [], 'diseases': [], 'proteins': []}
+        return self.scientific.biomedical_analysis_prompt(query, context, entities)
+    
+    def mechanism_explanation_prompt(self, query: str, context: str) -> str:
+        """Mechanism explanation prompt"""
+        entities = {'drugs': [], 'diseases': [], 'proteins': []}
+        return self.scientific.biomedical_analysis_prompt(query, context, entities)
+    
+    def hypothesis_testing_prompt(self, query: str, context: str) -> str:
+        """Hypothesis testing prompt"""
+        entities = {'drugs': [], 'diseases': [], 'proteins': []}
+        return self.scientific.biomedical_analysis_prompt(query, context, entities)

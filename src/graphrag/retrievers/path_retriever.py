@@ -1,6 +1,8 @@
 import networkx as nx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set, Tuple
 import logging
+import concurrent.futures
+from collections import defaultdict
 from ..core.graph_analytics import HighPerformanceGraphAnalytics
 from ..core.connection_resilience import ConnectionResilience
 import streamlit as st
@@ -8,105 +10,198 @@ import streamlit as st
 logger = logging.getLogger(__name__)
 
 class PathRetriever:
-    """Retrieves and analyzes paths between entities with intelligent scoring."""
+    """Retrieves and analyzes paths between entities with intelligent scoring and performance optimization."""
     
-    def __init__(self, graph: nx.MultiDiGraph):
+    def __init__(self, graph: nx.MultiDiGraph, max_workers: int = 4):
         self.graph = graph
         self.analytics = HighPerformanceGraphAnalytics(graph)
         self.resilience = ConnectionResilience()
+        self.max_workers = max_workers
+        
+        # Pre-compute node metadata for faster access
+        self._node_types = {node: data.get('type', 'unknown') 
+                           for node, data in graph.nodes(data=True)}
+        self._node_names = {node: data.get('name', node) 
+                           for node, data in graph.nodes(data=True)}
+        
+        # Thread pool for parallel operations
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        
+        # Cache for centrality metrics
+        self._centrality_cache = None
 
     @ConnectionResilience.with_retry(max_attempts=3, wait_seconds=1)
     def find_drug_disease_paths(self, drug_id: str, disease_id: str, max_paths: int = 5) -> List[Dict[str, Any]]:
-        """Find paths between drug and disease with intelligent scoring."""
+        """Find paths between drug and disease with intelligent scoring and parallel processing."""
         try:
             if drug_id not in self.graph or disease_id not in self.graph:
                 logger.warning(f"Node not found: {drug_id} or {disease_id}")
                 return []
 
-            # Use high-performance path finding
-            path_data = self.analytics.compute_shortest_paths([drug_id], [disease_id])
+            # Use parallel path finding for better performance
+            with self._executor:
+                # Submit primary path and alternative paths concurrently
+                primary_future = self._executor.submit(
+                    self._find_primary_path, drug_id, disease_id
+                )
+                alternatives_future = self._executor.submit(
+                    self._find_alternative_paths_parallel, drug_id, disease_id, max_paths - 1
+                )
+                
+                # Get results
+                primary_path = primary_future.result(timeout=10)
+                alternative_paths = alternatives_future.result(timeout=15)
 
-            if not path_data:
+            if not primary_path and not alternative_paths:
                 logger.info(f"No paths found between {drug_id} and {disease_id}")
                 return []
 
-            # Get the primary path
-            primary_path_key = f"{drug_id}->{disease_id}"
-            if primary_path_key not in path_data:
-                logger.info(f"No direct path found between {drug_id} and {disease_id}")
-                return []
+            # Combine all paths
+            all_paths = []
+            if primary_path:
+                all_paths.append(primary_path)
+            all_paths.extend(alternative_paths)
 
-            primary_path = path_data[primary_path_key]
-
-            # Find alternative paths using graph analytics
-            alternative_paths = self._find_alternative_paths(drug_id, disease_id, max_paths - 1)
-
-            # Combine and score all paths
-            all_paths = [primary_path] + alternative_paths
-            scored_paths = []
-
-            for path in all_paths:
-                enhanced_path = self._enhance_path_with_scoring(path)
-                scored_paths.append(enhanced_path)
+            # Enhanced parallel scoring of paths
+            scored_paths = self._score_paths_parallel(all_paths)
 
             # Sort by biological relevance score
             scored_paths.sort(key=lambda x: x['biological_score'], reverse=True)
             logger.info(f"Found {len(scored_paths)} scored paths between {drug_id} and {disease_id}")
             return scored_paths[:max_paths]
+            
         except Exception as e:
             logger.error(f"Path finding failed: {e}")
             return []
-
-    def _find_alternative_paths(self, drug_id: str, disease_id: str, max_alternative: int) -> List[Dict[str, Any]]:
-        """Find alternative paths through different intermediate nodes."""
+    
+    def _find_primary_path(self, drug_id: str, disease_id: str) -> Optional[Dict[str, Any]]:
+        """Find primary shortest path between drug and disease"""
         try:
-            alternative_paths = []
+            path_data = self.analytics.compute_shortest_paths([drug_id], [disease_id])
+            primary_path_key = f"{drug_id}->{disease_id}"
+            
+            if primary_path_key in path_data:
+                return path_data[primary_path_key]
+            return None
+            
+        except Exception as e:
+            logger.error(f"Primary path finding failed: {e}")
+            return None
+    
+    def _score_paths_parallel(self, paths: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Score multiple paths in parallel for better performance"""
+        if not paths:
+            return []
+        
+        # For small numbers of paths, use sequential processing
+        if len(paths) <= 3:
+            return [self._enhance_path_with_scoring(path) for path in paths]
+        
+        # Parallel scoring for larger path sets
+        with self._executor:
+            futures = [
+                self._executor.submit(self._enhance_path_with_scoring, path)
+                for path in paths
+            ]
+            
+            scored_paths = []
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    scored_path = future.result(timeout=8)
+                    scored_paths.append(scored_path)
+                except Exception as e:
+                    logger.warning(f"Path scoring failed: {e}")
+        
+        return scored_paths
 
+    def _find_alternative_paths_parallel(self, drug_id: str, disease_id: str, max_alternative: int) -> List[Dict[str, Any]]:
+        """Find alternative paths through different intermediate nodes with parallel processing."""
+        try:
+            # Get or compute centrality metrics with caching
+            if self._centrality_cache is None:
+                self._centrality_cache = self.analytics.compute_centrality_metrics()
+            
             # Get high-centrality intermediate nodes
-            centrality_metrics = self.analytics.compute_centrality_metrics()
             high_centrality_nodes = sorted(
-                centrality_metrics['betweenness'].items(),
+                self._centrality_cache['betweenness'].items(),
                 key=lambda x: x[1],
                 reverse=True
-            )[:20]  # Top 20 most central nodes
-
-            for intermediate_node, _ in high_centrality_nodes:
-                if intermediate_node in [drug_id, disease_id]:
-                    continue
-
-                try:
-                    # Find path through intermediate node
-                    path1_data = self.analytics.compute_shortest_paths([drug_id], [intermediate_node])
-                    path2_data = self.analytics.compute_shortest_paths([intermediate_node], [disease_id])
-
-                    path1_key = f"{drug_id}->{intermediate_node}"
-                    path2_key = f"{intermediate_node}->{disease_id}"
-
-                    if path1_key in path1_data and path2_key in path2_data:
-                        # Combine paths
-                        combined_path = path1_data[path1_key]['path'][:-1] + path2_data[path2_key]['path']
-
-                        alternative_path = {
-                            'path': combined_path,
-                            'length': len(combined_path) - 1,
-                            'path_names': [self.graph.nodes[node].get('name', node) for node in combined_path],
-                            'path_types': [self.graph.nodes[node].get('type', 'unknown') for node in combined_path],
-                            'score': (path1_data[path1_key]['score'] + path2_data[path2_key]['score']) / 2,
-                            'intermediate_node': intermediate_node
-                        }
-                        alternative_paths.append(alternative_path)
-
+            )[:30]  # Top 30 most central nodes for better alternatives
+            
+            # Filter out source and target nodes
+            intermediate_candidates = [
+                node for node, _ in high_centrality_nodes 
+                if node not in [drug_id, disease_id]
+            ][:20]  # Limit to top 20 candidates
+            
+            # Process intermediate nodes in parallel
+            chunk_size = max(1, len(intermediate_candidates) // self.max_workers)
+            node_chunks = [
+                intermediate_candidates[i:i + chunk_size] 
+                for i in range(0, len(intermediate_candidates), chunk_size)
+            ]
+            
+            alternative_paths = []
+            
+            with self._executor:
+                futures = [
+                    self._executor.submit(
+                        self._find_paths_through_intermediates, 
+                        drug_id, disease_id, chunk
+                    )
+                    for chunk in node_chunks
+                ]
+                
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        chunk_paths = future.result(timeout=12)
+                        alternative_paths.extend(chunk_paths)
+                        
+                        # Early termination if we have enough paths
                         if len(alternative_paths) >= max_alternative:
                             break
-
-                except Exception:
-                    continue
-
-            return alternative_paths
-
+                    except Exception as e:
+                        logger.warning(f"Alternative path chunk processing failed: {e}")
+            
+            return alternative_paths[:max_alternative]
+            
         except Exception as e:
             logger.error(f"Alternative path finding failed: {e}")
             return []
+    
+    def _find_paths_through_intermediates(self, drug_id: str, disease_id: str, 
+                                        intermediate_nodes: List[str]) -> List[Dict[str, Any]]:
+        """Find paths through a set of intermediate nodes"""
+        paths = []
+        
+        for intermediate_node in intermediate_nodes:
+            try:
+                # Find path through intermediate node
+                path1_data = self.analytics.compute_shortest_paths([drug_id], [intermediate_node])
+                path2_data = self.analytics.compute_shortest_paths([intermediate_node], [disease_id])
+
+                path1_key = f"{drug_id}->{intermediate_node}"
+                path2_key = f"{intermediate_node}->{disease_id}"
+
+                if path1_key in path1_data and path2_key in path2_data:
+                    # Combine paths
+                    combined_path = path1_data[path1_key]['path'][:-1] + path2_data[path2_key]['path']
+
+                    # Use cached node data for faster access
+                    alternative_path = {
+                        'path': combined_path,
+                        'length': len(combined_path) - 1,
+                        'path_names': [self._node_names.get(node, node) for node in combined_path],
+                        'path_types': [self._node_types.get(node, 'unknown') for node in combined_path],
+                        'score': (path1_data[path1_key]['score'] + path2_data[path2_key]['score']) / 2,
+                        'intermediate_node': intermediate_node
+                    }
+                    paths.append(alternative_path)
+
+            except Exception:
+                continue
+        
+        return paths
 
     def _enhance_path_with_scoring(self, path: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance path with biological relevance scoring."""
@@ -242,3 +337,24 @@ class PathRetriever:
         except Exception as e:
             logger.error(f"Mechanism description generation failed: {e}")
             return "Unable to generate mechanism description"
+    
+    def get_retriever_stats(self) -> Dict[str, Any]:
+        """Get statistics about the path retriever for performance monitoring"""
+        return {
+            "graph_nodes": len(self.graph.nodes()),
+            "graph_edges": len(self.graph.edges()),
+            "max_workers": self.max_workers,
+            "cached_centrality": self._centrality_cache is not None,
+            "node_types_cached": len(self._node_types),
+            "node_names_cached": len(self._node_names)
+        }
+    
+    def clear_cache(self):
+        """Clear cached data to free memory"""
+        self._centrality_cache = None
+        logger.info("PathRetriever cache cleared")
+    
+    def __del__(self):
+        """Cleanup resources"""
+        if hasattr(self, '_executor'):
+            self._executor.shutdown(wait=True)

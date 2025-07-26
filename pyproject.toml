@@ -52,6 +52,7 @@ dependencies = [
     "streamlit",
     "plotly",
     "weaviate",
+    "weaviate-client==4.8.0",
 ]
 
 [project.optional-dependencies]

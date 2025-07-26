@@ -406,3 +406,80 @@ class TestDataFlow:
         output_files = builder.save_graph(formats=["graphml", "pickle"])
         assert os.path.exists(output_files["graphml"])
         assert os.path.exists(output_files["pickle"])
+
+
+class TestGraphRAGPerformanceIntegration:
+    """Integration tests for GraphRAG performance optimizations"""
+    
+    def test_hardware_optimizer_integration(self):
+        """Test that hardware optimizer works in integration context"""
+        import sys
+        from pathlib import Path
+        
+        # Add src to path
+        sys.path.append(str(Path(__file__).parents[2] / "src"))
+        
+        try:
+            from graphrag.core.hardware_optimizer import get_hardware_optimizer, auto_optimize
+            
+            # Test hardware detection
+            optimizer = get_hardware_optimizer()
+            assert optimizer.cpu_count > 0
+            assert optimizer.memory_gb > 0
+            
+            # Test auto-optimization
+            config = auto_optimize()
+            assert "hardware_info" in config
+            assert "llm_config" in config
+            assert "threading_config" in config
+        except ImportError as e:
+            pytest.skip(f"Hardware optimizer not available: {e}")
+    
+    def test_optimized_components_integration(self):
+        """Test that optimized components work together"""
+        import sys
+        from pathlib import Path
+        import networkx as nx
+        
+        # Add src to path
+        sys.path.append(str(Path(__file__).parents[2] / "src"))
+        
+        try:
+            from graphrag.retrievers.subgraph_retriever import SubgraphRetriever
+            from graphrag.generators.response_builder import ResponseBuilder
+            
+            # Create test graph
+            G = nx.MultiDiGraph()
+            for i in range(50):
+                G.add_node(f"node_{i}", type="test", name=f"Node {i}")
+                if i > 0:
+                    G.add_edge(f"node_{i-1}", f"node_{i}", relation="connected")
+            
+            # Test SubgraphRetriever
+            retriever = SubgraphRetriever(G, max_workers=2)
+            subgraph = retriever.get_entity_subgraph(["node_25"], hops=2)
+            
+            assert isinstance(subgraph, nx.MultiDiGraph)
+            assert len(subgraph.nodes()) > 1
+            
+            # Test ResponseBuilder
+            builder = ResponseBuilder(max_workers=2, cache_size=64)
+            mock_data = {
+                "drugs": [{"id": "d1", "name": "Drug1", "similarity_score": 0.9}],
+                "diseases": [{"id": "dis1", "name": "Disease1", "similarity_score": 0.8}]
+            }
+            
+            response = builder.build_response(
+                query="Test integration query",
+                llm_response="Test response",
+                retrieved_data=mock_data,
+                subgraph_context="Test context",
+                query_type="test"
+            )
+            
+            assert isinstance(response, dict)
+            assert "citations" in response
+            assert "entities" in response
+            
+        except ImportError as e:
+            pytest.skip(f"GraphRAG components not available: {e}")

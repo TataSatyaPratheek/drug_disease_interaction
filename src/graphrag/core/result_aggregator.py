@@ -1,21 +1,27 @@
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 def aggregate_search_results(vector_results: Dict, graph_results: Dict, query_context: Dict) -> Dict[str, Any]:
     """Aggregate results from vector search and graph traversal"""
+    """Aggregate results from vector search (Weaviate) and graph traversal (Neo4j) for hybrid RAG."""
     try:
-        # Combine entity results
-        combined_entities = merge_entity_results(vector_results, graph_results)
-        
+        # Combine entity results with hybrid awareness
+        combined_entities = merge_entity_results_hybrid(vector_results, graph_results)
         # Build unified context
         unified_context = build_unified_context(combined_entities, query_context)
-        
-        # Extract citations
+        # Extract citations (with hybrid source info)
         citations = extract_citations_from_results(combined_entities)
-        
+        # Hybrid metadata
+        hybrid_sources = set()
+        for entity_list in combined_entities.values():
+            for entity in entity_list:
+                if "sources" in entity:
+                    hybrid_sources.update(entity["sources"])
+                elif "source" in entity:
+                    hybrid_sources.add(entity["source"])
         aggregated_result = {
             "entities": combined_entities,
             "context": unified_context,
@@ -24,14 +30,13 @@ def aggregate_search_results(vector_results: Dict, graph_results: Dict, query_co
                 "vector_search_count": count_vector_results(vector_results),
                 "graph_traversal_count": count_graph_results(graph_results),
                 "total_unique_entities": count_unique_entities(combined_entities),
-                "aggregation_timestamp": datetime.now().isoformat()
+                "aggregation_timestamp": datetime.now().isoformat(),
+                "sources": sorted(list(hybrid_sources))
             },
             "success": True
         }
-        
-        logger.info(f"Results aggregated: {aggregated_result['metadata']['total_unique_entities']} unique entities")
+        logger.info(f"Results aggregated: {aggregated_result['metadata']['total_unique_entities']} unique entities from {aggregated_result['metadata']['sources']}")
         return aggregated_result
-        
     except Exception as e:
         logger.error(f"Result aggregation failed: {e}")
         return {
@@ -42,42 +47,61 @@ def aggregate_search_results(vector_results: Dict, graph_results: Dict, query_co
             "success": False
         }
 
-def merge_entity_results(vector_results: Dict, graph_results: Dict) -> Dict[str, List[Dict]]:
-    """Merge entity results from different search methods"""
-    merged = {
+def merge_entity_results_hybrid(vector_results: Dict[str, List[Dict]], graph_results: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
+    """Merge entity results from Weaviate (vector) and Neo4j (graph) for hybrid RAG."""
+    merged: Dict[str, List[Dict]] = {
         "drugs": [],
         "diseases": [],
         "proteins": [],
         "relationships": []
     }
-    
+    # Index by ID for fast lookup
+    id_index: Dict[str, Dict[str, Dict]] = {k: {} for k in merged.keys()}
     # Add vector search results
     for entity_type in merged.keys():
-        if entity_type in vector_results:
-            for entity in vector_results[entity_type]:
-                entity["source"] = "vector_search"
-                merged[entity_type].append(entity)
-    
+        for entity in vector_results.get(entity_type, []):
+            eid = entity.get("id")
+            entity = dict(entity)  # Copy to avoid mutating input
+            entity["sources"] = ["vector_search"]
+            entity["source"] = "vector_search"
+            id_index[entity_type][eid] = entity
+            merged[entity_type].append(entity)
     # Add graph traversal results
     for entity_type in merged.keys():
-        if entity_type in graph_results:
-            for entity in graph_results[entity_type]:
-                entity["source"] = "graph_traversal"
-                # Check for duplicates by ID
-                existing_ids = [e.get("id") for e in merged[entity_type]]
-                if entity.get("id") not in existing_ids:
-                    merged[entity_type].append(entity)
+        for entity in graph_results.get(entity_type, []):
+            eid = entity.get("id")
+            if eid in id_index[entity_type]:
+                # Merge attributes and sources
+                existing = id_index[entity_type][eid]
+                # Merge sources
+                if "sources" in existing:
+                    if "graph_traversal" not in existing["sources"]:
+                        existing["sources"].append("graph_traversal")
                 else:
-                    # Merge information for existing entity
-                    merge_entity_information(merged[entity_type], entity)
-    
+                    existing["sources"] = [existing.get("source", "vector_search"), "graph_traversal"]
+                # Merge fields (prefer higher score, longer description, etc.)
+                for k, v in entity.items():
+                    if k in ["similarity", "score"]:
+                        if v > existing.get(k, 0):
+                            existing[k] = v
+                    elif k == "description":
+                        if v and (not existing.get(k) or len(v) > len(existing.get(k, ""))):
+                            existing[k] = v
+                    elif k not in existing or not existing[k]:
+                        existing[k] = v
+                existing["source"] = "hybrid"
+            else:
+                entity = dict(entity)
+                entity["sources"] = ["graph_traversal"]
+                entity["source"] = "graph_traversal"
+                id_index[entity_type][eid] = entity
+                merged[entity_type].append(entity)
     # Sort by relevance score if available
     for entity_type in merged.keys():
         merged[entity_type].sort(
-            key=lambda x: x.get("similarity", x.get("score", 0)), 
+            key=lambda x: x.get("similarity", x.get("score", 0)),
             reverse=True
         )
-    
     return merged
 
 def merge_entity_information(existing_entities: List[Dict], new_entity: Dict):
@@ -187,9 +211,7 @@ def generate_followup_questions(aggregated_results: Dict[str, Any], query_contex
     try:
         query_type = query_context.get("query_type", "general")
         entities = aggregated_results.get("entities", {})
-        
         followups = []
-        
         # Type-specific followups
         if query_type == "comparison":
             followups.extend([
@@ -209,16 +231,22 @@ def generate_followup_questions(aggregated_results: Dict[str, Any], query_contex
                 "Are there any drug interactions to be aware of?",
                 "What monitoring is recommended?"
             ])
-        
-        # Entity-based followups
+        # Entity-based followups (always add, even if over 3)
+        entity_followups = []
         if entities.get("drugs"):
-            followups.append("What other conditions could these drugs potentially treat?")
-        
+            entity_followups.append("What other conditions could these drugs potentially treat?")
         if entities.get("proteins"):
-            followups.append("What other drugs target these same proteins?")
-        
-        return followups[:3]  # Limit to 3 followups
-        
+            entity_followups.append("What other drugs target these same proteins?")
+        # Combine and limit to 3, but always prefer at least one entity-based if present
+        combined = followups + entity_followups
+        # If entity-based present and not in first 3, swap in
+        if entity_followups:
+            # Ensure at least one entity-based in the first 3
+            for ef in entity_followups:
+                if ef not in combined[:3]:
+                    combined = combined[:2] + [ef]
+                    break
+        return combined[:3]
     except Exception as e:
         logger.error(f"Failed to generate followup questions: {e}")
         return ["What additional information would be helpful?"]

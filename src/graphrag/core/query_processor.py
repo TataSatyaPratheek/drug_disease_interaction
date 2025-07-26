@@ -1,9 +1,10 @@
-import streamlit as st
+
 import logging
-from typing import Dict, Any, List
 import re
+from typing import Dict, List
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -29,90 +30,63 @@ class ProcessedQuery:
 
 def classify_query_type(query: str) -> str:
     """Classify query type based on content analysis"""
+    """Classify query type based on content analysis"""
     query_lower = query.lower()
-
-    # Enhanced classification with confidence scoring
     classification_rules = [
-        (["compare", "vs", "versus", "difference", "better", "prefer"], "comparison", 0.9),
-        (["mechanism", "how does", "pathway", "targets", "works"], "mechanism", 0.8),
-        (["side effect", "adverse", "toxicity", "safety", "risk"], "safety", 0.8),
-        (["repurpose", "new use", "alternative", "off-label"], "repurposing", 0.7),
-        (["interaction", "combine", "together", "with"], "interaction", 0.7),
-        (["treat", "therapy", "treatment", "cure"], "treatment", 0.6),
-        (["cause", "associated", "related", "linked"], "association", 0.6)
+        (re.compile(r"\b(compare|vs|versus|difference|better|prefer)\b", re.I), "comparison", 0.9),
+        (re.compile(r"\b(mechanism|how does|pathway|targets|works)\b", re.I), "mechanism", 0.8),
+        (re.compile(r"\b(side effect(s)?|adverse|toxicity|safety|risk)\b", re.I), "safety", 0.8),
+        (re.compile(r"\b(repurpose|new use|alternative|off-label)\b", re.I), "repurposing", 0.7),
+        (re.compile(r"\b(cause|associated|related|linked)\b", re.I), "association", 0.8),
+        (re.compile(r"\b(interact|interaction|combine|together|with)\b", re.I), "interaction", 0.7),
+        (re.compile(r"\b(treat|therapy|treatment|cure)\b", re.I), "treatment", 0.6)
     ]
-
     best_match = ("general", 0.0)
-
-    for keywords, category, confidence in classification_rules:
-        if any(keyword in query_lower for keyword in keywords):
+    for pattern, category, confidence in classification_rules:
+        if pattern.search(query_lower):
             if confidence > best_match[1]:
                 best_match = (category, confidence)
-
     return best_match[0]
 
 def enhanced_entity_extraction(query: str) -> Dict[str, List[str]]:
     """Enhanced entity extraction with medical terminology."""
+    """Enhanced entity extraction with medical terminology."""
     entities = {"drugs": [], "diseases": [], "proteins": []}
-
-    # Enhanced drug patterns
+    # Compile regex patterns once
     drug_patterns = [
-        r'\b[A-Z][a-z]+(?:mab|ine|ib|ol|pril|sartan|ide|in|cin|stat)\b',
-        r'\b(?:ACE inhibitor|ARB|beta.?blocker|statin|NSAID|antibiotic)s?\b',
-        r'\b(?:aspirin|ibuprofen|metformin|insulin|warfarin|prednisone)\b'
+        re.compile(r'\b[A-Z][a-z]+(?:mab|ine|ib|ol|pril|sartan|ide|in|cin|stat)\b', re.I),
+        re.compile(r'\b(?:ACE inhibitor|ARB|beta.?blocker|statin|NSAID|antibiotic)s?\b', re.I),
+        re.compile(r'\b(?:aspirin|ibuprofen|metformin|insulin|warfarin|prednisone)\b', re.I)
     ]
-
-    # Enhanced disease patterns
     disease_patterns = [
-        r'\b[A-Z][a-z]+(?:osis|itis|emia|oma|pathy|trophy|ism)\b',
-        r'\b(?:diabetes|hypertension|cancer|disease|syndrome|disorder)\b',
-        r'\b(?:COVID-19|HIV|AIDS|COPD|ADHD|PTSD)\b'
+        re.compile(r'\b[A-Z][a-z]+(?:osis|itis|emia|oma|pathy|trophy|ism)\b', re.I),
+        re.compile(r'\b(?:diabetes|hypertension|cancer|disease|syndrome|disorder)\b', re.I),
+        re.compile(r'\b(?:COVID-19|HIV|AIDS|COPD|ADHD|PTSD)\b', re.I)
     ]
-
-    # Enhanced protein patterns
     protein_patterns = [
-        r'\b[A-Z][A-Z0-9]+\b',  # Protein abbreviations
-        r'\b(?:protein|enzyme|receptor|kinase|antibody)\b'
+        re.compile(r'\b[A-Z][A-Z0-9]+\b', re.I),  # Protein abbreviations
+        re.compile(r'\b(?:protein|enzyme|receptor|kinase|antibody)\b', re.I)
     ]
-
-    # Extract with patterns
     for pattern in drug_patterns:
-        matches = re.findall(pattern, query, re.IGNORECASE)
-        entities["drugs"].extend(matches)
-
+        entities["drugs"].extend(pattern.findall(query))
     for pattern in disease_patterns:
-        matches = re.findall(pattern, query, re.IGNORECASE)
-        entities["diseases"].extend(matches)
-
+        entities["diseases"].extend(pattern.findall(query))
     for pattern in protein_patterns:
-        matches = re.findall(pattern, query, re.IGNORECASE)
-        entities["proteins"].extend(matches)
-
+        entities["proteins"].extend(pattern.findall(query))
     # Clean and deduplicate
     for entity_type in entities:
         entities[entity_type] = list(set(entities[entity_type]))
-
     return entities
 
-@st.cache_data(hash_funcs={"builtins.str": str})
+
 def preprocess_query(query: str, max_results: int = 15) -> ProcessedQuery:
     """Enhanced query preprocessing with strategy determination."""
     try:
-        # Basic cleaning
         cleaned_query = query.strip()
-
-        # Enhanced classification
         query_type = classify_query_type(cleaned_query)
-
-        # Enhanced entity extraction
         extracted_entities = enhanced_entity_extraction(cleaned_query)
-
-        # Determine optimal strategy
         strategy = determine_enhanced_strategy(query_type, extracted_entities)
-
-        # Generate reasoning
         reasoning = generate_processing_reasoning(query_type, extracted_entities, strategy)
-
         preprocessing_result = ProcessedQuery(
             original_query=query,
             cleaned_query=cleaned_query,
@@ -122,10 +96,8 @@ def preprocess_query(query: str, max_results: int = 15) -> ProcessedQuery:
             confidence=0.8,
             reasoning=reasoning
         )
-
         logger.info(f"Enhanced query processing: type={query_type}, strategy={strategy}")
         return preprocessing_result
-
     except Exception as e:
         logger.error(f"Query preprocessing failed: {e}")
         return ProcessedQuery(
@@ -141,32 +113,25 @@ def preprocess_query(query: str, max_results: int = 15) -> ProcessedQuery:
 def determine_enhanced_strategy(query_type: str, extracted_entities: Dict[str, List[str]]) -> QueryStrategy:
     """Determine optimal search strategy with enhanced logic."""
     total_entities = sum(len(entities) for entities in extracted_entities.values())
-
-    # Enhanced strategy mapping
     if query_type == "comparison" and total_entities >= 2:
         return QueryStrategy.COMPARATIVE_ANALYSIS
-    elif query_type in ["mechanism", "interaction"] and total_entities >= 1:
+    if query_type in ["mechanism", "interaction"] and total_entities >= 1:
         return QueryStrategy.PATHWAY_TRAVERSAL
-    elif query_type == "repurposing":
+    if query_type == "repurposing":
         return QueryStrategy.COMMUNITY_ANALYSIS
-    elif total_entities == 1:
+    if total_entities == 1:
         return QueryStrategy.ENTITY_EXPANSION
-    else:
-        # Default to a broader analysis if multiple entities or ambiguous query
-        return QueryStrategy.MULTI_ENTITY_ANALYSIS
+    return QueryStrategy.MULTI_ENTITY_ANALYSIS
 
 def generate_processing_reasoning(query_type: str, entities: Dict, strategy: QueryStrategy) -> str:
     """Generate reasoning explanation for query processing decisions."""
     entity_count = sum(len(v) for v in entities.values())
-
     reasoning = f"Query classified as '{query_type}' with {entity_count} extracted entities. "
     reasoning += f"Selected strategy: {strategy.value}. "
-
     if strategy == QueryStrategy.COMPARATIVE_ANALYSIS:
         reasoning += "Will retrieve both entities and compare their properties."
     elif strategy == QueryStrategy.PATHWAY_TRAVERSAL:
         reasoning += "Will explore molecular pathways and mechanisms."
     elif strategy == QueryStrategy.COMMUNITY_ANALYSIS:
         reasoning += "Will analyze community structure for repurposing opportunities."
-
     return reasoning
