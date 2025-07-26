@@ -1,65 +1,59 @@
 # src/tests/test_integration/conftest.py - FINAL CORRECTED VERSION
 
+
 import pytest
 import time
+import httpx
 from neo4j import GraphDatabase
 import weaviate
-from httpx import AsyncClient
 
-def is_ready(services):
-    """Helper function to check if all docker services are responsive."""
+def is_responsive(url):
+    """Check if a service is responsive."""
     try:
-        # Check Neo4j
-        neo4j_port = services.port_for("neo4j", 7687)
-        with GraphDatabase.driver(f"bolt://localhost:{neo4j_port}", auth=("neo4j", "123lol123")) as driver:
-            driver.verify_connectivity()
-        
-        # Check Weaviate
-        weaviate_port = services.port_for("weaviate", 8080)
-        with weaviate.connect_to_local(host="localhost", port=weaviate_port) as client:
-            if not client.is_ready():
-                return False
-        
-        # All checks passed
+        response = httpx.get(url, timeout=5)
+        response.raise_for_status()
         return True
-    except Exception as e:
-        print(f"Health check during test setup failed: {e}")
+    except (httpx.ConnectError, httpx.HTTPStatusError):
         return False
 
+
 @pytest.fixture(scope="session")
-def live_services(docker_services):
+def live_services(docker_ip, docker_services):
     """
-    The main fixture that uses the 'docker_services' provided by pytest-docker.
-    It waits until all services are fully responsive before yielding.
+    Ensure that all services are up and responsive.
+    The `docker_services` fixture is provided by the pytest-docker plugin.
     """
-    print("Waiting for Docker services to become healthy...")
+    api_url = f"http://{docker_ip}:{docker_services.port_for('api', 8000)}/api/v1/health"
+    # Use the wait_until_responsive utility provided by the plugin
     docker_services.wait_until_responsive(
-        timeout=60.0, pause=1.0, check=lambda: is_ready(docker_services)
+        timeout=120.0, pause=2.0, check=lambda: is_responsive(api_url)
     )
     return docker_services
 
+
 @pytest.fixture(scope="session")
-def neo4j_driver(live_services):
+def neo4j_driver(docker_ip, live_services):
     """Provides a driver to the integration test Neo4j instance."""
     port = live_services.port_for("neo4j", 7687)
-    driver = GraphDatabase.driver(f"bolt://localhost:{port}", auth=("neo4j", "123lol123"))
+    driver = GraphDatabase.driver(f"bolt://{docker_ip}:{port}", auth=("neo4j", "123lol123"))
     yield driver
     driver.close()
 
-@pytest.fixture(scope="session")
-def weaviate_client(live_services):
-    """Provides a client to the integration test Weaviate instance."""
-    port = live_services.port_for("weaviate", 8080)
-    client = weaviate.connect_to_local(host="localhost", port=port)
-    yield client
-    # The 'with' statement in 'is_ready' handles closing, but this is good practice
-    client.close()
 
 @pytest.fixture(scope="session")
-def api_client(live_services):
+def weaviate_client(docker_ip, live_services):
+    """Provides a client to the integration test Weaviate instance."""
+    port = live_services.port_for("weaviate", 8080)
+    client = weaviate.connect_to_local(host=docker_ip, port=port)
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def api_client(docker_ip, live_services):
     """Provides an httpx client to the running API service."""
     port = live_services.port_for("api", 8000)
-    return AsyncClient(base_url=f"http://localhost:{port}", timeout=30)
+    return httpx.AsyncClient(base_url=f"http://{docker_ip}:{port}", timeout=30)
 
 # The data setup fixture now depends on the new live_services fixtures
 @pytest.fixture(scope="module", autouse=True)
@@ -76,14 +70,12 @@ def setup_test_data(neo4j_driver, weaviate_client):
             """)
     except Exception as e:
         pytest.fail(f"Failed to set up Neo4j test data: {e}")
-        
     # Setup Weaviate data
     try:
         if weaviate_client.collections.exists("Drug"):
             weaviate_client.collections.delete("Drug")
         if weaviate_client.collections.exists("Disease"):
             weaviate_client.collections.delete("Disease")
-        
         drug_collection = weaviate_client.collections.create(
             name="Drug",
             properties=[
@@ -97,5 +89,4 @@ def setup_test_data(neo4j_driver, weaviate_client):
         })
     except Exception as e:
         pytest.fail(f"Failed to set up Weaviate test data: {e}")
-        
     yield # Tests run here

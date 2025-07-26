@@ -1,12 +1,14 @@
+
 # src/api/routes/search.py - USE FASTAPI ROUTER
 
-# src/api/routes/search.py - UPDATED
 
 from fastapi import APIRouter, HTTPException, Depends
+from src.api.models.requests import HybridSearchRequest, EntityDetailsRequest
+from src.api.models.responses import HybridSearchResponse, EntityResult
+from src.api.dependencies import HybridEngineDep, Neo4jDep
 from llama_index.core import QueryBundle
 import time
 import logging
-
 from fastapi_cache.decorator import cache
 from fastapi.responses import StreamingResponse
 
@@ -46,9 +48,8 @@ async def hybrid_search_stream(
         logger.error(f"Streaming search failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Streaming search failed.")
 
-from src.api.models.requests import HybridSearchRequest, EntityDetailsRequest
-from src.api.models.responses import HybridSearchResponse, EntityResult
-from src.api.dependencies import HybridEngineDep, Neo4jDep
+
+
 
 
 router = APIRouter()
