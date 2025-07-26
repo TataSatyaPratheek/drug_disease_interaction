@@ -112,4 +112,4 @@ markers = [
     "asyncio: mark a test as asynchronous.",
 ]
 # Tell pytest-docker where to find the compose file
-docker_compose_file = "docker/docker-compose.yml"
+addopts = "--docker-compose=docker/docker-compose.yml"
