@@ -13,6 +13,16 @@ class Neo4jService:
     def __init__(self, uri: str, user: str, password: str, max_workers: int = 4):
         self.driver = neo4j.GraphDatabase.driver(uri, auth=(user, password))
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.verify_connection()
+
+    def verify_connection(self):
+        """Verifies the connection to the database."""
+        try:
+            self.driver.verify_connectivity()
+            logger.info("Successfully connected to Neo4j database.")
+        except Exception as e:
+            logger.error(f"Failed to connect to Neo4j: {e}")
+            raise
     
     async def search_drug_disease_paths(self, query: str, limit: int = 20) -> List[Dict]:
         """Async drug-disease path search optimized for your dataset"""

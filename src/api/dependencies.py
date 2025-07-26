@@ -23,24 +23,25 @@ def set_services(neo4j: Neo4jService, weaviate: WeaviateService, llm: LLMService
     _llm_service = llm
     _hybrid_engine = engine
 
+
 def get_neo4j_service() -> Neo4jService:
     if _neo4j_service is None:
-        raise HTTPException(status_code=503, detail="Neo4j service not ready")
+        raise HTTPException(status_code=503, detail="Neo4j service is not initialized. The application might be starting up.")
     return _neo4j_service
 
 def get_weaviate_service() -> WeaviateService:
     if _weaviate_service is None:
-        raise HTTPException(status_code=503, detail="Weaviate service not ready")
+        raise HTTPException(status_code=503, detail="Weaviate service is not initialized. The application might be starting up.")
     return _weaviate_service
 
 def get_llm_service() -> LLMService:
     if _llm_service is None:
-        raise HTTPException(status_code=503, detail="LLM service not ready")
+        raise HTTPException(status_code=503, detail="LLM service is not initialized. The application might be starting up.")
     return _llm_service
 
 def get_hybrid_engine() -> HybridRAGEngine:
     if _hybrid_engine is None:
-        raise HTTPException(status_code=503, detail="Hybrid engine not ready")
+        raise HTTPException(status_code=503, detail="Hybrid engine is not initialized. The application might be starting up.")
     return _hybrid_engine
 
 # Type aliases for cleaner dependency injection
