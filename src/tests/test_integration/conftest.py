@@ -1,49 +1,47 @@
-# src/tests/test_integration/conftest.py - SIMPLIFIED & RELIABLE
+# src/tests/test_integration/conftest.py - ROBUST VERSION
 
 import pytest
+import time
 import httpx
 from neo4j import GraphDatabase
 import weaviate
 from typing import AsyncGenerator
 
-def check_service_health(url: str, timeout: int = 5) -> bool:
-    """Check if a service is responsive."""
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            response = client.get(url)
-            return response.status_code == 200
-    except Exception:
-        return False
+# Helper function to poll a service until it's ready
+def wait_for_service(name: str, url: str, timeout: int = 60):
+    """Polls a service URL until it returns a 200 OK or the timeout is reached."""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            with httpx.Client() as client:
+                response = client.get(url, timeout=2)
+                if response.status_code == 200:
+                    print(f"✅ {name} service is ready.")
+                    return True
+        except httpx.ConnectError:
+            pass  # Service not up yet
+        except Exception:
+            pass
+        time.sleep(2)
+    pytest.fail(f"🔴 {name} service did not become ready within {timeout} seconds.")
+
+@pytest.fixture(scope="session", autouse=True)
+def ensure_services_are_running_before_tests():
+    """
+    Blocks test execution until all Docker services are responsive.
+    This runs automatically for the entire test session.
+    """
+    print("\n--- Ensuring all services are running for integration tests ---")
+    wait_for_service("Neo4j", "http://localhost:7474")
+    wait_for_service("Weaviate", "http://localhost:8080/v1/.well-known/ready")
+    wait_for_service("Ollama", "http://localhost:11434")
+    print("--- All services are responsive. Starting tests. ---\n")
 
 @pytest.fixture(scope="session")
-def ensure_services_running():
-    """
-    Ensure all required services are running before tests.
-    This fixture fails fast if services aren't available.
-    """
-    services = {
-        "Neo4j": "http://localhost:7474",
-        "Weaviate": "http://localhost:8080/v1/.well-known/ready", 
-        "Ollama": "http://localhost:11434",
-    }
-    
-    failed_services = []
-    for name, url in services.items():
-        if not check_service_health(url, timeout=10):
-            failed_services.append(name)
-    
-    if failed_services:
-        pytest.skip(f"Required services not running: {', '.join(failed_services)}. "
-                   f"Start them with: cd docker && docker-compose up -d")
-    
-    return True
-
-@pytest.fixture(scope="session")
-def neo4j_driver(ensure_services_running):
+def neo4j_driver():
     """Provides a driver to the local Neo4j instance."""
     driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "123lol123"))
     try:
-        # Test connection
         with driver.session() as session:
             session.run("RETURN 1").single()
         yield driver
@@ -53,7 +51,7 @@ def neo4j_driver(ensure_services_running):
         driver.close()
 
 @pytest.fixture(scope="session") 
-def weaviate_client(ensure_services_running):
+def weaviate_client():
     """Provides a client to the local Weaviate instance."""
     try:
         client = weaviate.connect_to_local(host="localhost", port=8080)
@@ -67,7 +65,7 @@ def weaviate_client(ensure_services_running):
             client.close()
 
 @pytest.fixture(scope="session")
-async def api_client(ensure_services_running) -> AsyncGenerator[httpx.AsyncClient, None]:
+async def api_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Provides an HTTP client for testing the API."""
     async with httpx.AsyncClient(
         base_url="http://localhost:8000", 

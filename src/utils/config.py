@@ -1,7 +1,5 @@
-
 # src/utils/config.py - ENHANCED VERSION
 
-# src/utils/config.py - ENHANCED
 from pydantic_settings import BaseSettings
 from pydantic import Field, validator, AnyHttpUrl
 import json
@@ -9,25 +7,33 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 class DatabaseConfig(BaseSettings):
-    neo4j_uri: str = Field("bolt://localhost:7687", description="Neo4j Bolt URI")
+    neo4j_uri: str = Field("bolt://neo4j:7687", description="Neo4j Bolt URI")
     neo4j_user: str = Field("neo4j", description="Neo4j username")
     neo4j_password: str = Field("123lol123", description="Neo4j password", repr=False)
-    weaviate_url: AnyHttpUrl = Field("http://localhost:8080", description="Weaviate instance URL")
+    weaviate_url: AnyHttpUrl = Field("http://weaviate:8080", description="Weaviate instance URL")
 
     class Config:
         env_prefix = "DDI_DB_"
 
 class OllamaConfig(BaseSettings):
+    # This will automatically pick up DDI_OLLAMA_URL from the environment
     url: AnyHttpUrl = Field("http://localhost:11434", description="Ollama API base URL")
     request_timeout: int = Field(120, description="Request timeout in seconds")
     
     class Config:
         env_prefix = "DDI_OLLAMA_"
 
+class RedisConfig(BaseSettings):
+    url: str = Field("redis://localhost:6379", description="Redis connection URL")
+
+    class Config:
+        env_prefix = "REDIS_"
+
 
 class AppConfig(BaseSettings):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+    redis: RedisConfig = Field(default_factory=RedisConfig)  # <-- Add this line
     hardware: Dict[str, Any] = {}
 
     def __init__(self, **values: Any):

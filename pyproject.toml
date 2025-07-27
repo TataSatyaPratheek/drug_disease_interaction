@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "drug_disease_interaction"
 version = "0.1.0"
-description = "Drug-Disease Interaction Prediction using Graph Neural Networks"
+description = "Drug-Disease Interaction Prediction using Hybrid RAG"
 authors = [{name = "Satya Pratheek TATA", email = "satyapratheek.tata@edhec.com"}]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -16,49 +16,40 @@ classifiers = [
 ]
 
 dependencies = [
-    # ... your existing dependencies
-    "llama-index>=0.10.0",
-    "streamlit-agraph",
-    "tenacity",
-    "streamlit",
-    "pandas",
-    "plotly",
-    "networkx",
-    "ollama",
-    "numpy",
-    "pandas",
-    "networkx",
-    "torch",
-    "torch-geometric",
-    "rdkit",
-    "scikit-learn",
-    "matplotlib",
-    "seaborn",
-    "tqdm",
-    "fastapi",
-    "uvicorn",
-    "python-dotenv",
-    "ipykernel",
-    "uniprot-id-mapper",
-    "typer",
-    "rich",
-    "python-louvain",
-    "scipy",
-    "pytrials",
-    "requests",
-    "ollama",
-    "chromadb",
-    "sentence-transformers",
-    "streamlit",
-    "plotly",
-    "weaviate",
-    "weaviate-client==4.8.0",
-    "neo4j>=5.28.1",
-    "pytest>=8.3.5",
+    # Core API Framework
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Database Drivers (Essential)
+    "neo4j>=5.15.0",
+    "weaviate-client>=4.4.0",
+
+    # LlamaIndex Core (Essential for RAG)
+    "llama-index-core>=0.10.0",
+    "llama-index-llms-ollama>=0.1.0",
+    "llama-index-embeddings-ollama>=0.1.0",
+
+    # ML/NLP (Essential)
+    "sentence-transformers>=2.2.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+
+    # HTTP Client
+    "httpx>=0.25.0",
+    "ollama>=0.3.0",
+
+    # Caching & Storage
+    "redis>=5.0.0",
+    "fastapi-cache2>=0.2.0",
+
+    # Basic utilities
+    "python-dotenv>=1.0.0",
+
+    # Testing (Development)
+    "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
-    "httpx>=0.24.0",
-    "redis>=6.1.1",
-    "fastapi-cache2>=0.2.2",
 ]
 
 [project.optional-dependencies]

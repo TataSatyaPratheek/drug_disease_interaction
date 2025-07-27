@@ -7,14 +7,18 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - NEO4J_URI=bolt://neo4j:7687
+      # ✅ FIX: Explicitly tell the API which URL to use for Ollama inside the Docker network.
+      - DDI_OLLAMA_URL=http://ollama:11434
+      - NEO4J_URI=bolt://neo4j:7687   # <--- change from localhost to neo4j
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=123lol123
       - WEAVIATE_URL=http://weaviate:8080
+      - REDIS_URL=redis://redis:6379 # Add Redis URL
     depends_on:
       - neo4j
       - weaviate
       - ollama
+      - redis # Add dependency on Redis
     volumes:
       - ../config:/app/config
       - ../logs:/app/logs

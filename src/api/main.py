@@ -32,8 +32,8 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting Hybrid RAG API...")
 
-    # Initialize Redis and FastAPI Cache on startup
-    redis_client = aioredis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
+    # ✅ FIX: Use the Redis URL from the centralized settings
+    redis_client = aioredis.from_url(settings.redis.url, encoding="utf-8", decode_responses=True)
     FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache")
 
     try:

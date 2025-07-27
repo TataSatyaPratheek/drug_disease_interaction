@@ -1,21 +1,34 @@
-# docker/Dockerfile
+# docker/Dockerfile - CORRECTED ORDER
+
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install pip build dependencies
-RUN pip install --upgrade pip
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files and README for setuptools
-COPY pyproject.toml README.md ./
-COPY src/ ./src
+# Install uv for dependency management
+RUN pip install uv
 
-# Install project dependencies using pip and setuptools
-RUN pip install .
+# Copy project configuration files
+COPY pyproject.toml uv.lock* ./
+COPY src/ ./src/
+COPY README.md ./
 
-# Copy the rest of the application code
-COPY src/ ./src
+# Now install dependencies with the source code available
+RUN uv sync --frozen --no-dev
 
-EXPOSE 8000
+# Copy any remaining files
+COPY . .
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# Use uv to run the application
+CMD ["uv", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -3,11 +3,28 @@ import weaviate
 from typing import List, Dict, Any
 import asyncio
 import logging
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 class WeaviateService:
-
+    def __init__(self, url):
+        url = str(url)
+        parsed = urlparse(url)
+        host = parsed.hostname
+        port = parsed.port
+        self.client = weaviate.connect_to_local(
+            host=host,
+            port=port
+        )
+        try:
+            if not self.client.is_ready():
+                raise ConnectionError("Weaviate is not ready.")
+            logger.info("Successfully connected to Weaviate.")
+        except Exception as e:
+            logger.error(f"Failed to connect to Weaviate at {url}: {e}")
+            raise
+    
     async def get_db_stats(self) -> Dict[str, Any]:
         stats = {}
         for col_name in ['Drug', 'Disease', 'Target', 'Pathway']:
@@ -19,16 +36,6 @@ class WeaviateService:
                 stats[col_name] = "error"
         return {"total_objects_by_collection": stats}
     """Weaviate service using official client - DON'T REINVENT VECTOR SEARCH"""
-    
-    def __init__(self, url: str):
-        try:
-            self.client = weaviate.connect_to_local(host=url.split('//')[1].split(':')[0], port=int(url.split(':')[-1]))
-            if not self.client.is_ready():
-                raise ConnectionError("Weaviate is not ready.")
-            logger.info("Successfully connected to Weaviate.")
-        except Exception as e:
-            logger.error(f"Failed to connect to Weaviate at {url}: {e}")
-            raise
     
     async def hybrid_search(self, query: str, collections: List[str] = None, limit: int = 20) -> List[Dict]:
         """Async hybrid search across your populated collections"""
