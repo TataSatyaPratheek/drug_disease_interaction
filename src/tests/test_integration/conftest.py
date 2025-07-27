@@ -1,10 +1,7 @@
-
-# src/tests/test_integration/conftest.py - RELIABLE VERSION
+# src/tests/test_integration/conftest.py - SIMPLIFIED & RELIABLE
 
 import pytest
-import time
 import httpx
-import asyncio
 from neo4j import GraphDatabase
 import weaviate
 from typing import AsyncGenerator
@@ -37,7 +34,7 @@ def ensure_services_running():
     
     if failed_services:
         pytest.skip(f"Required services not running: {', '.join(failed_services)}. "
-                   f"Start them with: docker-compose -f docker/docker-compose.yml up -d")
+                   f"Start them with: cd docker && docker-compose up -d")
     
     return True
 
@@ -46,21 +43,28 @@ def neo4j_driver(ensure_services_running):
     """Provides a driver to the local Neo4j instance."""
     driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "123lol123"))
     try:
-        driver.verify_connectivity()
+        # Test connection
+        with driver.session() as session:
+            session.run("RETURN 1").single()
         yield driver
+    except Exception as e:
+        pytest.skip(f"Neo4j connection failed: {e}")
     finally:
         driver.close()
 
 @pytest.fixture(scope="session") 
 def weaviate_client(ensure_services_running):
     """Provides a client to the local Weaviate instance."""
-    client = weaviate.connect_to_local(host="localhost", port=8080)
     try:
+        client = weaviate.connect_to_local(host="localhost", port=8080)
         if not client.is_ready():
             pytest.skip("Weaviate is not ready")
         yield client
+    except Exception as e:
+        pytest.skip(f"Weaviate connection failed: {e}")
     finally:
-        client.close()
+        if 'client' in locals():
+            client.close()
 
 @pytest.fixture(scope="session")
 async def api_client(ensure_services_running) -> AsyncGenerator[httpx.AsyncClient, None]:
@@ -72,7 +76,7 @@ async def api_client(ensure_services_running) -> AsyncGenerator[httpx.AsyncClien
         yield client
 
 @pytest.fixture(scope="function")
-def clean_test_data(neo4j_driver, weaviate_client):
+def clean_test_data(neo4j_driver):
     """Setup and cleanup test data for each test."""
     # Setup test data
     with neo4j_driver.session() as session:
