@@ -16,43 +16,44 @@ An AI-powered research copilot designed to accelerate drug discovery and analysi
 - **Local LLM Integration**: Powered by **Ollama** and orchestrated with **LlamaIndex**, enabling private and cost-effective language model inference on local hardware.
 - **Fully Containerized**: The entire stack (frontend, backend, databases, LLM) is containerized using **Docker** and managed with a single `docker-compose` file for easy deployment.
 
+
 ## 🏗️ System Architecture
 
 The system is designed with a modern, decoupled microservices architecture, ensuring scalability and maintainability.
 
+**High-level Architecture Overview:**
+
+```text
+User (Researcher)
+   │
+   ▼
+Streamlit Frontend (UI)
+   │  REST API
+   ▼
+FastAPI Backend (API Layer)
+   │  Natural Language Query
+   ▼
+Hybrid RAG Engine (Core)
+   ├── Cypher Query ───────────────► Neo4j Graph DB
+   ├── Vector Search ─────────────► Weaviate Vector DB
+   │
+   └─► CrossEncoder Reranker
+           │
+           ▼
+        Ollama LLM Service
+           │
+           ▼
+   <─── Generated Answer ──────────
+   (Back to Backend, then to Frontend)
 ```
-graph TD
-    subgraph User Interface
-        U[👩🔬 Researcher] -- HTTPS --> F[Streamlit Frontend]
-    end
 
-    subgraph API Layer
-        F -- REST API Request --> B[FastAPI Backend]
-    end
 
-    subgraph Core RAG Engine
-        B -- Natural Language Query --> HRE[Hybrid RAG Engine]
-        
-        subgraph Parallel Retrieval
-            HRE -- Cypher Query --> KG[(Neo4j Graph DB)]
-            HRE -- Vector Search --> VS[(Weaviate Vector DB)]
-        end
+**Description:**
 
-        subgraph Reranking & Synthesis
-            RR[CrossEncoder Reranker]
-            LLM[Ollama LLM Service]
-            
-            KG -- Graph Results --> RR
-            VS -- Vector Results --> RR
-            RR -- Top-K Context --> LLM
-            HRE -- Formatted Query + Context --> LLM
-        end
-
-        LLM -- Generated Answer --> B
-    end
-
-    B -- JSON Response --> F
-```
+- The user interacts with the Streamlit frontend, which communicates with the FastAPI backend via REST API.
+- The backend passes queries to the Hybrid RAG Engine, which retrieves information from both Neo4j (graph) and Weaviate (vector) databases.
+- Results are reranked using a CrossEncoder model, and the best context is sent to the Ollama LLM service for answer generation.
+- The generated answer is returned to the frontend for display.
 
 ## 🛠️ Tech Stack
 
@@ -84,8 +85,8 @@ From your terminal, follow these steps:
 
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
-cd drug-disease-interaction
+git clone https://github.com/TataSatyaPratheek/drug_disease_interaction.git
+cd drug_disease_interaction
 
 # 2. Make the startup script executable
 chmod +x start_local_poc.sh
@@ -127,37 +128,30 @@ The project is organized into a clean, modular structure:
 └── start_local_poc.sh      # The main startup script
 ```
 
+
+
 ## 📊 Data Preparation
 
-The project uses several biomedical databases that require registration and download.
+This project requires several biomedical datasets. You must manually obtain these files from their official sources and place them in the correct locations under the `data/` directory before running any processing scripts.
 
-### DrugBank Data
+### Required Raw Data Files
 
-To download DrugBank data, you need to register for a free account at [DrugBank.ca](https://go.drugbank.com/).
+- **DrugBank**
+  - Register for a free account at [DrugBank](https://go.drugbank.com/).
+  - Download the full DrugBank XML file (e.g., `full_database.xml`).
+  - Place it at: `data/raw/full_database/full_database.xml`
 
-```bash
-# Parse DrugBank XML
-python src/scripts/parse_drugbank.py --input data/raw/full_database/full_database.xml --output data/processed/drugs
+- **MeSH (Medical Subject Headings)**
+  - Download the latest MeSH descriptor data from the [NIH MeSH Download Page](https://www.nlm.nih.gov/databases/download/mesh.html).
+  - Place the descriptor file (e.g., `desc2025.xml` or similar) at: `data/raw/mesh/desc2025.xml`
 
-# Process vocabulary
-python src/scripts/parse_vocabulary.py --input data/raw/open_data/drugbank_all_drugbank_vocabulary.csv
-```
+- **OpenTargets**
+  - Download the latest OpenTargets Platform data from the [OpenTargets Downloads](https://platform.opentargets.org/downloads-data).
+  - Place the relevant JSON or parquet files at: `data/raw/open_targets/`
 
-### Disease Data from MeSH
+Refer to the script docstrings and comments in `scripts/` for the exact filenames and formats expected by each processing step.
 
-```bash
-# Download and process MeSH data
-python src/scripts/download_mesh.py --output data/raw/mesh
-python src/scripts/process_mesh.py --input data/raw/mesh --output data/processed/diseases/mesh
-```
-
-### OpenTargets Platform Data
-
-```bash
-# Download and process OpenTargets data
-python src/scripts/download_opentargets.py --output data/raw/open_targets
-python src/scripts/process_opentargets.py --input data/raw/open_targets --output data/processed/associations/opentargets
-```
+**Note:** This project does not provide the raw data files. You are responsible for obtaining them and placing them in the correct locations as described above.
 
 ## 🗺️ Roadmap & Future Work
 
@@ -187,26 +181,34 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 
 If you use this system in your research, please cite the following resources:
 
+
 ### DrugBank
-```
-Knox C, Wilson M, Klinger CM, et al. DrugBank 6.0: the DrugBank Knowledgebase for 2024. 
+
+```text
+Knox C, Wilson M, Klinger CM, et al. DrugBank 6.0: the DrugBank Knowledgebase for 2024.
 Nucleic Acids Res. 2024 Jan 5;52(D1):D1265-D1275. doi: 10.1093/nar/gkad976.
 ```
 
+
 ### OpenTargets Platform
-```
-Ochoa D, Karim M, Ghoussaini M, et al. Human genetics evidence supports two-thirds of the 
+
+```text
+Ochoa D, Karim M, Ghoussaini M, et al. Human genetics evidence supports two-thirds of the
 2021 FDA-approved drugs. Nat Rev Drug Discov. 2022 Aug;21(8):551. doi: 10.1038/d41573-022-00114-1.
 ```
 
+
 ### MeSH (Medical Subject Headings)
-```
-Nelson SJ, Schopen M, Savage AG, Schulman JL, Arluk N. The MeSH translation maintenance system: 
+
+```text
+Nelson SJ, Schopen M, Savage AG, Schulman JL, Arluk N. The MeSH translation maintenance system:
 structure, interface design, and implementation. Stud Health Technol Inform. 2004;107(Pt 1):67-9.
 ```
 
+
 ### PyTorch Geometric
-```
-Fey M, Lenssen JE. Fast Graph Representation Learning with PyTorch Geometric. 
+
+```text
+Fey M, Lenssen JE. Fast Graph Representation Learning with PyTorch Geometric.
 ICLR Workshop on Representation Learning on Graphs and Manifolds.
 ```
